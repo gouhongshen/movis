@@ -1,6 +1,7 @@
 package script
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"gorm.io/driver/mysql"
@@ -32,12 +33,24 @@ func (op *OpType) String() string {
 	return opType2Name[*op]
 }
 
+type SpanInfoLinePageData struct {
+	Labels []string
+	Values []float64
+	XAxis  string
+	YAxis  string
+	Title  string
+}
+
+var spanObjReqHeatmapData []SpanInfoLinePageData
+var spanObjReqThroughTimeData []SpanInfoLinePageData
+
 var renderData html.LinePageData
 
 type SpanVis struct {
-	db                        *gorm.DB
-	infos                     []_type.SpanInfoTable
-	readRecords, writeRecords []_type.SpanInfoTable
+	db           *gorm.DB
+	infos        []_type.SpanInfoTable
+	readRecords  []_type.SpanInfoTable
+	writeRecords []_type.SpanInfoTable
 }
 
 var spanVis *SpanVis
@@ -69,7 +82,7 @@ func spanVisInit() {
 	}
 }
 
-func (s *SpanVis) tmplInject(w http.ResponseWriter, req *http.Request) {
+func (s *SpanVis) webReport(w http.ResponseWriter) {
 	wd, _ := os.Getwd()
 	tmpl, err := template.ParseFiles(wd + "/html/line.html")
 	if err != nil {
@@ -82,10 +95,47 @@ func (s *SpanVis) tmplInject(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
+	if _type.ReportFile != "" {
+		// user hope to generate a paper report
+		paperReportForSpanInfo(tt)
+	} else {
+		s.webReport(w)
+	}
+}
+
 func S3FSOperationHandler(w http.ResponseWriter, req *http.Request) {
 	spanVisInit()
 	spanVis.visualize(S3FSOperation)
-	spanVis.tmplInject(w, req)
+	spanVis.generateReport(w, S3FSOperation)
+}
+
+func (s *SpanVis) decodeCSV(tt OpType) {
+	file, err := os.Open(_type.SourceFile)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	funcs := _type.SpanInfoMemberSetFunc()
+	reader := csv.NewReader(file)
+	heads, err := reader.Read()
+	for {
+		records, err := reader.Read()
+		if err != nil {
+			return
+		}
+		info := _type.SpanInfoTable{}
+		for i := 0; i < len(heads); i++ {
+			vals := _type.SpanInfoMapTag2Values(&info)
+			vals[heads[i]].Set(funcs[heads[i]](records[i]))
+		}
+
+		if info.SpanKind != tt.String() {
+			continue
+		}
+		s.infos = append(s.infos, info)
+	}
+
 }
 
 func (s *SpanVis) PrepareData(tt OpType) {
@@ -93,8 +143,8 @@ func (s *SpanVis) PrepareData(tt OpType) {
 		s.db.Table("span_info").Where(fmt.Sprintf("span_kind='%s'", tt.String())).Find(&s.infos)
 	} else {
 		// decode data from file
+		s.decodeCSV(tt)
 	}
-
 	condition := ""
 	if tt == S3FSOperation {
 		condition = "S3FS"
@@ -135,34 +185,33 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType) {
 			return data[round][i].EndTime.Before(data[round][j].EndTime)
 		})
 
-		if len(data[round]) == 0 {
-			continue
-		}
-
 		var cntByDuration []float64
 		var endTime []string
-		last := data[round][0].EndTime
 
-		idx := 0
-		for idx < len(data[round]) {
-			cnt := int64(0)
-			for idx < len(data[round]) && data[round][idx].EndTime.Sub(last) <= time.Second {
-				cnt++
-				idx++
+		if len(data[round]) != 0 {
+			last := data[round][0].EndTime
+
+			idx := 0
+			for idx < len(data[round]) {
+				cnt := int64(0)
+				for idx < len(data[round]) && data[round][idx].EndTime.Sub(last) <= time.Second {
+					cnt++
+					idx++
+				}
+
+				if idx < len(data[round]) {
+					last = data[round][idx].EndTime
+				}
+
+				endTime = append(endTime, data[round][idx-1].EndTime.String())
+				cntByDuration = append(cntByDuration, float64(cnt))
 			}
-
-			if idx < len(data[round]) {
-				last = data[round][idx].EndTime
-			}
-
-			endTime = append(endTime, data[round][idx-1].EndTime.String())
-			cntByDuration = append(cntByDuration, float64(cnt))
 		}
 
 		var labels []string
 		var values []float64
 
-		for idx, _ = range endTime {
+		for idx, _ := range endTime {
 			labels = append(labels, endTime[idx])
 			values = append(values, cntByDuration[idx])
 		}
@@ -188,9 +237,6 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 			}
 
 			name := extra["name"].(string)
-			//if strings.HasSuffix(name, ".csv") {
-			//	continue
-			//}
 
 			_, ok := name2Cnt[name]
 			name2Cnt[name]++

@@ -53,21 +53,36 @@ func fillDefault() {
 
 }
 
-// type 1: -http=:dstPort -hSrcHost -PSrcPort -uSrcUsrName -pSrcPwd
-// type 2: -f srcFile
+// the -o is optional, means save the report as a file
+// read data from db
+// type 1: -http=:dstPort -hSrcHost -PSrcPort -uSrcUsrName -pSrcPwd {-o file_path}
+//
+// read data from csv file
+// type 2: -f srcFile {-o file_path}
 const (
-	ArgsFormat1 = 3
-	ArgsFormat2 = 6
+	ArgsFormat1 = 6
+	ArgsFormat2 = 3
 )
 
 func decodeArgs(args []string) bool {
-	if len(args) == ArgsFormat1 {
-		if args[1] != "-f" {
-			return false
+	checkReportFile := func(start int) {
+		if len(args) == start+1 {
+			fmt.Printf("arg invalid: %s, expected -o file_path\n", strings.Join(args[start:], " "))
+			return
 		}
-		_type.SourceFile = args[2]
-		return true
-	} else if len(args) == ArgsFormat2 {
+		if len(args) > start+1 {
+			if args[start] != "-o" {
+				fmt.Printf("arg invalid: %s, expected -o \n", args[start:])
+				return
+			}
+			_type.ReportFile = args[start+1]
+		} else {
+			fmt.Println("too much args")
+		}
+	}
+
+	// -http=:dstPort -hSrcHost -PSrcPort -uSrcUsrName -pSrcPwd {-o file_path}
+	if len(args) >= ArgsFormat1 {
 		idx := map[string]*string{
 			"-http=:": &_type.DstPort,
 			"-h":      &_type.SrcHost,
@@ -88,7 +103,16 @@ func decodeArgs(args []string) bool {
 			}
 			*o = strings.Trim(curArg, p)
 		}
+		checkReportFile(ArgsFormat1)
+		return true
 
+		//	-f srcFile {-o file_path}
+	} else if len(args) >= ArgsFormat2 {
+		if args[1] != "-f" {
+			return false
+		}
+		_type.SourceFile = args[2]
+		checkReportFile(ArgsFormat2)
 		return true
 	}
 
