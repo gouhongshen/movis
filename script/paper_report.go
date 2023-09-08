@@ -21,9 +21,9 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqHeatmapData[idx].Title,
 			func(s string) bool {
 				if len(s) == 0 {
-					return true
+					return false
 				}
-				return false
+				return true
 			})
 	}
 
@@ -33,7 +33,10 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqThroughTimeData[idx].Values,
 			spanObjReqThroughTimeData[idx].Title,
 			func(s string) bool {
-				return false
+				if len(s) < 1 {
+					return false
+				}
+				return true
 			})
 	}
 
@@ -43,7 +46,7 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReadLatencyData[idx].Values,
 			spanObjReadLatencyData[idx].Title,
 			func(s string) bool {
-				return false
+				return true
 			})
 	}
 
@@ -62,7 +65,7 @@ func getBar(v float64, sum float64) string {
 
 func report(w io.Writer,
 	labels []string, values []float64, title string,
-	stop func(string) bool) {
+	accept func(string) bool) {
 	// assumed that values has descending order
 	w.Write([]byte(title + "\n\n"))
 
@@ -77,8 +80,8 @@ func report(w io.Writer,
 
 	for i := 0; i < len(labels); i++ {
 		bar := getBar(values[i], sum)
-		if stop(bar) {
-			break
+		if !accept(bar) {
+			continue
 		}
 		t.AppendRow([]interface{}{labels[i], bar, values[i]})
 	}
