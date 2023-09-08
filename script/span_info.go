@@ -43,6 +43,7 @@ func (op *OpType) String() string {
 
 var spanObjReqHeatmapData []html.SignalLinePageData
 var spanObjReqThroughTimeData []html.SignalLinePageData
+var spanObjReadLatencyData []html.SignalLinePageData
 
 var renderData html.LinePageData
 
@@ -172,7 +173,8 @@ func (s *SpanVis) PrepareData(tt OpType) {
 func (s *SpanVis) visualize(tt OpType) {
 	s.PrepareData(tt)
 	s.visualize_ObjReqHeatmap(tt)
-	s.visualize_ObjReqThroughTime(tt, time.Second)
+	s.visualize_ObjReqThroughTime(tt, time.Second*5)
+	s.visualize_ObjReadLatency(tt)
 }
 
 func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_type.SpanInfoTable) {
@@ -185,6 +187,46 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 		}
 	}
 	return
+}
+
+func (s *SpanVis) visualize_ObjReadLatency(tt OpType) {
+	title := "Read"
+	data := s.readRecords
+
+	sort.Slice(data, func(i, j int) bool {
+		return data[i].EndTime.Before(data[j].EndTime)
+	})
+
+	cnInfo, tnInfo := s.parseTNAndCN(data)
+	getData := func(info []_type.SpanInfoTable) (values []float64, labels []string) {
+		for idx := range info {
+			extra := s.unmarshExtra(info[idx].Extra)
+			name := extra["name"].(string)
+			labels = append(labels, strings.Split(name, "-")[0]+" # "+info[idx].EndTime.String())
+			// time.Millisecond
+			values = append(values, float64(info[idx].Duration/(1000*1000)))
+		}
+		return
+	}
+
+	appendData := func(st string, labels []string, values []float64) {
+		spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
+			Labels: labels,
+			Values: values,
+			XAxis:  "时间戳",
+			YAxis:  "时延 (ms)",
+			Title:  st + "  " + tt.String() + "  " + title + ":  Obj Read Latency",
+		})
+	}
+
+	values, labels := getData(cnInfo)
+	appendData("CN", labels, values)
+
+	values, labels = getData(tnInfo)
+	appendData("TN", labels, values)
+
+	s.appendToRenderData(spanObjReadLatencyData)
+
 }
 
 func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration) {
@@ -216,6 +258,10 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration)
 				if idx < len(info) {
 					last = info[idx].EndTime
 				}
+				if cnt == 0 {
+					continue
+				}
+
 				endTime = append(endTime, info[idx-1].EndTime.String())
 				cntByDuration = append(cntByDuration, float64(cnt))
 			}
@@ -241,6 +287,14 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration)
 	s.appendToRenderData(spanObjReqThroughTimeData)
 }
 
+func (s *SpanVis) unmarshExtra(extra string) map[string]interface{} {
+	var ret map[string]interface{}
+	if err := json.Unmarshal([]byte(extra), &ret); err != nil {
+		fmt.Println(fmt.Errorf(err.Error()))
+	}
+	return ret
+}
+
 func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 	title := []string{"Read", "Write"}
 	data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
@@ -253,10 +307,7 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 			name2Cnt := make(map[string]float64)
 
 			for idx, _ := range info {
-				var extra map[string]interface{}
-				if err := json.Unmarshal([]byte(info[idx].Extra), &extra); err != nil {
-					fmt.Println(fmt.Errorf(err.Error()))
-				}
+				extra := s.unmarshExtra(info[idx].Extra)
 				name := extra["name"].(string)
 				_, ok := name2Cnt[name]
 				name2Cnt[name]++
@@ -298,24 +349,3 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 func (s *SpanVis) appendToRenderData(data []html.SignalLinePageData) {
 	renderData.Data = append(renderData.Data, data...)
 }
-
-//func (s *SpanVis) appendToRenderData(
-//	labels []string, values []float64,
-//	xaxis string, yaxis string, title string) {
-//
-//	renderData.Data = append(renderData.Data,
-//		struct {
-//			Labels []string
-//			Values []float64
-//			XAxis  string
-//			YAxis  string
-//			Title  string
-//		}{
-//			Labels: labels,
-//			Values: values,
-//			XAxis:  xaxis,
-//			YAxis:  yaxis,
-//			Title:  title,
-//		},
-//	)
-//}

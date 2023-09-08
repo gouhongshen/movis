@@ -37,6 +37,16 @@ func paperReportForSpanInfo(tt OpType) {
 			})
 	}
 
+	for idx := range spanObjReadLatencyData {
+		report(file,
+			spanObjReadLatencyData[idx].Labels,
+			spanObjReadLatencyData[idx].Values,
+			spanObjReadLatencyData[idx].Title,
+			func(s string) bool {
+				return false
+			})
+	}
+
 }
 
 func getBar(v float64, sum float64) string {
