@@ -20,7 +20,7 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqHeatmapData[idx].Values,
 			spanObjReqHeatmapData[idx].Title,
 			func(s string) bool {
-				if len(s) <= 1 {
+				if len(s) == 0 {
 					return true
 				}
 				return false
@@ -40,7 +40,7 @@ func paperReportForSpanInfo(tt OpType) {
 }
 
 func getBar(v float64, sum float64) string {
-	maxLen := float64(80)
+	maxLen := float64(1000)
 
 	bar := ""
 	l := int(v / sum * maxLen)
@@ -75,6 +75,6 @@ func report(w io.Writer,
 
 	t.Render()
 
-	w.Write([]byte("\n\n"))
+	w.Write([]byte("\n\n\n"))
 
 }
