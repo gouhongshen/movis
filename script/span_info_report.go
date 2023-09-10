@@ -6,10 +6,11 @@ import (
 	"log"
 	_type "movis/type"
 	"os"
+	"time"
 )
 
 func paperReportForSpanInfo(tt OpType) {
-	file, err := os.Create(_type.ReportFile)
+	file, err := os.Create(_type.SpanReportDir + "report_" + time.Now().String())
 	if err != nil {
 		log.Panicf(err.Error())
 	}
@@ -46,6 +47,9 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReadLatencyData[idx].Values,
 			spanObjReadLatencyData[idx].Title,
 			func(s string) bool {
+				if len(s) < 1 {
+					return false
+				}
 				return true
 			})
 	}
@@ -53,7 +57,7 @@ func paperReportForSpanInfo(tt OpType) {
 }
 
 func getBar(v float64, sum float64) string {
-	maxLen := float64(1000)
+	maxLen := float64(500)
 
 	bar := ""
 	l := int(v / sum * maxLen)
@@ -71,7 +75,7 @@ func report(w io.Writer,
 
 	t := table.NewWriter()
 	t.SetOutputMirror(w)
-	t.AppendHeader(table.Row{"label", "rate", "cnt"})
+	t.AppendHeader(table.Row{"label", "rate", "cnt/latency(ms)"})
 
 	sum := float64(0)
 	for _, v := range values {

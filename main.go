@@ -2,23 +2,23 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"movis/script"
 	_type "movis/type"
 	"net/http"
 	"os"
-	"strings"
 )
 
 func main() {
-	decodeArgs(os.Args)
-	fillDefault()
+	decodeArgs()
+	_type.FillTypeDefault()
 
 	defer release()
 
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/span_info", spanRoot)
 	http.HandleFunc("/span_info/s3_fs_operation", script.S3FSOperationHandler)
-	//http.HandleFunc("/log_info", script.VisLogInfoHandler)
+	http.HandleFunc("/span_info/local_fs_operation", script.LocalFSOperationHandler)
 
 	fmt.Printf("Server started at :%s\n", _type.DstPort)
 	if err := http.ListenAndServe(":"+_type.DstPort, nil); err != nil {
@@ -30,93 +30,60 @@ func release() {
 
 }
 
-func fillDefault() {
-	if _type.DstPort == "" {
-		_type.DstPort = "11235"
-	}
-
-	if _type.SrcPort == "" {
-		_type.SrcPort = "6001"
-	}
-
-	if _type.SrcHost == "" {
-		_type.SrcHost = "127.0.0.1"
-	}
-
-	if _type.SrcPassword == "" {
-		_type.SrcPassword = "111"
-	}
-
-	if _type.SrcUsrName == "" {
-		_type.SrcUsrName = "dump"
-	}
-
-}
-
-// the -o is optional, means save the report as a file
-// read data from db
-// type 1: -http=:dstPort -hSrcHost -PSrcPort -uSrcUsrName -pSrcPwd {-o file_path}
+// host, port, usr name, pwd all have the default value, for the details see type.go
+// but if user specified the -f argument，it will only read data from file which follows that parameter.
+// the allowed format like this:
 //
-// read data from csv file
-// type 2: -f srcFile {-o file_path}
-const (
-	ArgsFormat1 = 6
-	ArgsFormat2 = 3
-)
+//	-x y -r s
+//
+// this format is not allowed:
+//
+//	-xy -rs
+func decodeArgs() {
+	args := os.Args[1:]
+	if len(args) == 0 {
+		return
+	}
 
-func decodeArgs(args []string) bool {
-	checkReportFile := func(start int) {
-		if len(args) == start+1 {
-			fmt.Printf("arg invalid: %s, expected -o file_path\n", strings.Join(args[start:], " "))
-			return
+	name2Args := map[string]*string{
+		"-http": &_type.DstPort,
+		"-h":    &_type.SrcHost,
+		"-p":    &_type.SrcPassword,
+		"-u":    &_type.SrcUsrName,
+		"-P":    &_type.SrcPort,
+		"-f":    &_type.SourceFile,
+	}
+	// -h, -p, -u, -P are mutually exclusive with -f
+
+	if len(args)%2 != 0 {
+		panic("expecting an even number of parameters")
+	}
+
+	x, y := false, false
+	for i := 0; i < len(args); {
+		if _, ok := name2Args[args[i]]; !ok {
+			log.Panicf("no such parameter: %s", args[i])
 		}
-		if len(args) > start+1 {
-			if args[start] != "-o" {
-				fmt.Printf("arg invalid: %s, expected -o \n", args[start:])
-				return
+
+		if args[i] == "-http" {
+			*name2Args["-http"] = args[i+1]
+
+		} else if args[i] == "-f" {
+			if y == true {
+				panic("-h, -p, -u, -P are mutually exclusive with -f")
 			}
-			_type.ReportFile = args[start+1]
+			x = true
+			*name2Args["-f"] = args[i+1]
+
 		} else {
-			fmt.Println("too much args")
-		}
-	}
-
-	// -http=:dstPort -hSrcHost -PSrcPort -uSrcUsrName -pSrcPwd {-o file_path}
-	if len(args) >= ArgsFormat1 {
-		idx := map[string]*string{
-			"-http=:": &_type.DstPort,
-			"-h":      &_type.SrcHost,
-			"-p":      &_type.SrcPassword,
-			"-u":      &_type.SrcUsrName,
-			"-P":      &_type.SrcPort,
-		}
-
-		for p, o := range idx {
-			curArg := ""
-			for _, arg := range args {
-				if strings.HasPrefix(arg, p) {
-					curArg = arg
-				}
+			if x == true {
+				panic("-h, -p, -u, -P are mutually exclusive with -f")
 			}
-			if curArg == "" {
-				return false
-			}
-			*o = strings.Trim(curArg, p)
+			y = true
+			*name2Args[args[i]] = args[i+1]
 		}
-		checkReportFile(ArgsFormat1)
-		return true
-
-		//	-f srcFile {-o file_path}
-	} else if len(args) >= ArgsFormat2 {
-		if args[1] != "-f" {
-			return false
-		}
-		_type.SourceFile = args[2]
-		checkReportFile(ArgsFormat2)
-		return true
+		i += 2
 	}
-
-	return false
 }
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {

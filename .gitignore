@@ -1,1 +1,4 @@
 .idea
+reports
+src_data
+*.csv

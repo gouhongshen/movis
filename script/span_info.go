@@ -33,14 +33,6 @@ func (op *OpType) String() string {
 	return opType2Name[*op]
 }
 
-//type SpanInfoLinePageData struct {
-//	Labels []string
-//	Values []float64
-//	XAxis  string
-//	YAxis  string
-//	Title  string
-//}
-
 var spanObjReqHeatmapData []html.SignalLinePageData
 var spanObjReqThroughTimeData []html.SignalLinePageData
 var spanObjReadLatencyData []html.SignalLinePageData
@@ -61,6 +53,11 @@ func spanVisInit() {
 		spanVis.infos = make([]_type.SpanInfoTable, 0)
 		spanVis.readRecords = make([]_type.SpanInfoTable, 0)
 		spanVis.writeRecords = make([]_type.SpanInfoTable, 0)
+
+		renderData.Data = make([]html.SignalLinePageData, 0)
+		spanObjReadLatencyData = make([]html.SignalLinePageData, 0)
+		spanObjReqHeatmapData = make([]html.SignalLinePageData, 0)
+		spanObjReqThroughTimeData = make([]html.SignalLinePageData, 0)
 	}()
 
 	if spanVis != nil {
@@ -97,11 +94,15 @@ func (s *SpanVis) webReport(w http.ResponseWriter) {
 }
 
 func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
-	if _type.ReportFile != "" {
-		// user hope to generate a paper report
-		paperReportForSpanInfo(tt)
-	}
+	// user hope to generate a paper report
+	paperReportForSpanInfo(tt)
 	s.webReport(w)
+}
+
+func LocalFSOperationHandler(w http.ResponseWriter, req *http.Request) {
+	spanVisInit()
+	spanVis.visualize(LocalFSOperation)
+	spanVis.generateReport(w, LocalFSOperation)
 }
 
 func S3FSOperationHandler(w http.ResponseWriter, req *http.Request) {
@@ -138,9 +139,35 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 
 }
 
+func (s *SpanVis) saveCSV(tt OpType) {
+	name := fmt.Sprintf("./src_data/%s_%s", tt.String(), time.Now().String())
+	file, err := os.Create(name)
+	if err != nil {
+		log.Panic(err.Error())
+		return
+	}
+	writer := csv.NewWriter(file)
+	writer.UseCRLF = false
+
+	if err = writer.Write(_type.SpanInfoTableCSVHead()); err != nil {
+		log.Panic(err.Error())
+		return
+	}
+
+	for idx := range s.infos {
+		if err = writer.Write(_type.SpanInfoTableRow2Str(&s.infos[idx])); err != nil {
+			log.Panic(err.Error())
+			return
+		}
+	}
+	writer.Flush()
+}
+
 func (s *SpanVis) PrepareData(tt OpType) {
 	if _type.SourceFile == "" {
 		s.db.Table("span_info").Where(fmt.Sprintf("span_kind='%s'", tt.String())).Find(&s.infos)
+		// here, we also save the data read from db as CSV file
+		s.saveCSV(tt)
 	} else {
 		// decode data from file
 		s.decodeCSV(tt)
