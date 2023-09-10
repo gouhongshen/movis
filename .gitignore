@@ -1,4 +1,4 @@
 .idea
-src_data/*.records
-reports/span_info/*.report
+src_data
+reports
 *.csv

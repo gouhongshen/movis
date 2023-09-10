@@ -141,6 +141,10 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 
 func (s *SpanVis) saveCSV(tt OpType) {
 	name := fmt.Sprintf("./src_data/%s_%s.records", tt.String(), time.Now().String())
+	if err := os.MkdirAll(name, os.ModePerm); err != nil {
+		panic(err.Error())
+	}
+
 	file, err := os.Create(name)
 	if err != nil {
 		log.Panic(err.Error())

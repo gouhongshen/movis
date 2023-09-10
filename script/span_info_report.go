@@ -7,11 +7,17 @@ import (
 	"log"
 	_type "movis/type"
 	"os"
+	"path/filepath"
 	"time"
 )
 
 func paperReportForSpanInfo(tt OpType) {
-	file, err := os.Create(fmt.Sprintf("%sreport_%s.report", _type.SpanReportDir, time.Now().String()))
+	path := fmt.Sprintf("%sreport_%s.report", _type.SpanReportDir, time.Now().String())
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		panic(err.Error())
+	}
+
+	file, err := os.Create(path)
 	if err != nil {
 		log.Panicf(err.Error())
 	}
