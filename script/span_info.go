@@ -12,6 +12,7 @@ import (
 	_type "movis/type"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -141,7 +142,7 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 
 func (s *SpanVis) saveCSV(tt OpType) {
 	name := fmt.Sprintf("./src_data/%s_%s.records", tt.String(), time.Now().String())
-	if err := os.MkdirAll(name, os.ModePerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(name), os.ModePerm); err != nil {
 		panic(err.Error())
 	}
 
