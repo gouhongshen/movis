@@ -1,6 +1,7 @@
 package script
 
 import (
+	"fmt"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"io"
 	"log"
@@ -10,7 +11,7 @@ import (
 )
 
 func paperReportForSpanInfo(tt OpType) {
-	file, err := os.Create(_type.SpanReportDir + "report_" + time.Now().String())
+	file, err := os.Create(fmt.Sprintf("%sreport_%s.report", _type.SpanReportDir, time.Now().String()))
 	if err != nil {
 		log.Panicf(err.Error())
 	}
