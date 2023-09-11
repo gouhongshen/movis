@@ -34,6 +34,41 @@ func SpanInfoTableCSVHead() []string {
 	}
 }
 
+func (s *SpanInfoTable) SetVal(name string, val string) {
+	switch name {
+	case "trace_id":
+		s.TraceId = val
+	case "span_id":
+		s.SpanId = val
+	case "parent_span_id":
+		s.ParentSpanId = val
+	case "span_kind":
+		s.SpanKind = val
+	case "node_uuid":
+		s.NodeUUID = val
+	case "node_type":
+		s.NodeType = val
+	case "span_name":
+		s.SpanName = val
+	case "start_time":
+		s.StartTime, _ = time.Parse("2006-01-02 15:04:05", val)
+	case "end_time":
+		s.EndTime, _ = time.Parse("2006-01-02 15:04:05", val)
+	case "duration":
+		dur, err := strconv.Atoi(val)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		s.Duration = int64(dur)
+	case "resource":
+		s.Resource = val
+	case "extra":
+		s.Extra = val
+	default:
+		panic("no such name")
+	}
+}
+
 func SpanInfoTableRow2Str(info *SpanInfoTable) []string {
 	return []string{
 		info.TraceId, info.SpanId, info.ParentSpanId, info.SpanKind,

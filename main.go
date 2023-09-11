@@ -28,6 +28,8 @@ func run() {
 	http.HandleFunc("/span_info", spanRoot)
 	http.HandleFunc("/span_info/s3_fs_operation", script.S3FSOperationHandler)
 	http.HandleFunc("/span_info/local_fs_operation", script.LocalFSOperationHandler)
+	http.HandleFunc("/span_info/mem_cache_operation", script.MemCacheOperationHandler)
+	http.HandleFunc("/span_info/disk_cache_operation", script.DiskCacheOperationHandler)
 
 	fmt.Printf("Server started at :%s\n", _type.DstPort)
 	if err := http.ListenAndServe(":"+_type.DstPort, nil); err != nil {
@@ -127,6 +129,8 @@ func spanRoot(w http.ResponseWriter, req *http.Request) {
         <ul>
             <li><a href="/span_info/local_fs_operation"> Local FS Operation </a></li>
             <li><a href="/span_info/s3_fs_operation"> S3 FS Operation </a></li>
+			<li><a href="/span_info/mem_cache_operation"> Memory Cache Operation </a></li>
+            <li><a href="/span_info/disk_cache_operation"> Disk Cache Operation </a></li>
         </ul>
     </body>
     </html>

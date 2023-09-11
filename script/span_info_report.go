@@ -82,7 +82,7 @@ func report(w io.Writer,
 
 	t := table.NewWriter()
 	t.SetOutputMirror(w)
-	t.AppendHeader(table.Row{"label", "rate", "cnt/latency(ms)"})
+	t.AppendHeader(table.Row{"label", "rate", "cnt"})
 
 	sum := float64(0)
 	for _, v := range values {
