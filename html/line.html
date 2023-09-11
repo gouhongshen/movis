@@ -33,7 +33,7 @@
         var ctx = containers[i].querySelector('.chartCanvas').getContext('2d');
 
         var chart = new Chart(ctx, {
-            type: 'line',
+            type: data[i].ChartType,
             data: {
                 labels: data[i].Labels,
                 datasets: [{

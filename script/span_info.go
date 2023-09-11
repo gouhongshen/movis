@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"html/template"
 	"log"
+	"math"
 	"movis/html"
 	_type "movis/type"
 	"net/http"
@@ -212,7 +213,7 @@ func (s *SpanVis) PrepareData(tt OpType) {
 func (s *SpanVis) visualize(tt OpType) {
 	s.PrepareData(tt)
 	s.visualize_ObjReqHeatmap(tt)
-	s.visualize_ObjReqThroughTime(tt, time.Second*5)
+	s.visualize_ObjReqThroughTime(tt, time.Second*10)
 	s.visualize_ObjReadLatency(tt)
 }
 
@@ -251,24 +252,50 @@ func (s *SpanVis) visualize_ObjReadLatency(tt OpType) {
 		return
 	}
 
-	appendData := func(st string, labels []string, values []float64) {
+	appendData := func(st string, labels []string, values []float64, chartType string) {
 		spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
-			Labels: labels,
-			Values: values,
-			XAxis:  "时间戳",
-			YAxis:  "时延 (ms)",
-			Title:  st + "  " + tt.String() + "  " + title + ":  Obj Read Latency",
+			Labels:    labels,
+			Values:    values,
+			XAxis:     "时间戳",
+			YAxis:     "时延 (ms)",
+			ChartType: chartType,
+			Title:     st + "  " + tt.String() + "  " + title + ":  Obj Read Latency",
 		})
 	}
 
 	values, labels := getData(cnInfo)
-	appendData("CN", labels, values)
+	appendData("CN", labels, values, "line")
 
 	values, labels = getData(tnInfo)
-	appendData("TN", labels, values)
+	appendData("TN", labels, values, "line")
 
 	s.appendToRenderData(spanObjReadLatencyData)
 
+	// we also need to add a bar chart for latency
+	s.barChartForLatency(appendData)
+}
+
+func (s *SpanVis) barChartForLatency(appendData func(string, []string, []float64, string)) {
+	rang := [][2]float64{
+		{0, 2}, {2, 4}, {4, 6}, {6, 8}, {8, 10},
+		{10, 30}, {30, 50}, {50, 70}, {70, 100},
+		{100, 300}, {300, 500}, {500, 700}, {700, 1000},
+		{1000, 2000}, {2000, 3000}, {3000, 4000}, {4000, 5000}, {5000, 6000}, {6000, math.MaxFloat64},
+	}
+
+	getData := func(info []_type.SpanInfoTable) (values []float64, labels []string) {
+		for i := range rang {
+			labels = append(labels, fmt.Sprintf("%f-%f", rang[i][0], rang[i][0]))
+		}
+
+		values = make([]float64, len(rang))
+		for i := range info {
+			// to ms
+			ms := info[i].Duration / (1000 * 1000)
+
+		}
+
+	}
 }
 
 func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration) {
@@ -310,20 +337,21 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration)
 			return cntByDuration, endTime
 		}
 
-		appendData := func(st string, labels []string, values []float64) {
+		appendData := func(st string, labels []string, values []float64, chartType string) {
 			spanObjReqThroughTimeData = append(spanObjReqThroughTimeData, html.SignalLinePageData{
-				Labels: labels,
-				Values: values,
-				XAxis:  "时间戳",
-				YAxis:  "object 访问数量",
-				Title:  st + "  " + tt.String() + "  " + title[round] + ":  Obj Req Through Time",
+				Labels:    labels,
+				Values:    values,
+				XAxis:     "时间戳",
+				YAxis:     "object 访问数量",
+				ChartType: chartType,
+				Title:     st + "  " + tt.String() + "  " + title[round] + ":  Obj Req Through Time",
 			})
 		}
 		values, labels := getData(cnInfo)
-		appendData("CN", labels, values)
+		appendData("CN", labels, values, "line")
 
 		values, labels = getData(tnInfo)
-		appendData("TN", labels, values)
+		appendData("TN", labels, values, "line")
 
 	}
 	s.appendToRenderData(spanObjReqThroughTimeData)
@@ -369,21 +397,22 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 			return
 		}
 
-		appendData := func(st string, labels []string, values []float64) {
+		appendData := func(st string, labels []string, values []float64, chartType string) {
 			spanObjReqHeatmapData = append(spanObjReqHeatmapData, html.SignalLinePageData{
-				Labels: labels,
-				Values: values,
-				XAxis:  "object name",
-				YAxis:  "object 访问数量",
-				Title:  st + "  " + tt.String() + "  " + title[round] + ":  Obj Request Heatmap",
+				Labels:    labels,
+				Values:    values,
+				XAxis:     "object name",
+				YAxis:     "object 访问数量",
+				ChartType: chartType,
+				Title:     st + "  " + tt.String() + "  " + title[round] + ":  Obj Request Heatmap",
 			})
 		}
 
 		values, labels := getData(cnInfo)
-		appendData("CN", labels, values)
+		appendData("CN", labels, values, "line")
 
 		values, labels = getData(tnInfo)
-		appendData("TN", labels, values)
+		appendData("TN", labels, values, "line")
 	}
 	s.appendToRenderData(spanObjReqHeatmapData)
 }
