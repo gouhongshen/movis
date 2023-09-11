@@ -15,7 +15,7 @@ trace.SpanKindLocalFSVis
 1. 向 mo 发送命令启用 trace
 ```MySQL
 # 启动 CN 的trace，注意，不要有多余的空格，下同
-select mo_ctl("cn", "TraceSpan", "all:enbale:local,s3");
+select mo_ctl("cn", "TraceSpan", "all:enable:local,s3");
 
 # 启动 DN 的trace
 select mo_ctl("dn", "TraceSpan", "enable:local,s3");
