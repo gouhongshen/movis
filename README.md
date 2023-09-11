@@ -47,7 +47,7 @@ go run main.go -f src.csv -http 11235 -p 222
 
 4. 待 visualizer 执行完成后，再向 mo 发送命令关闭 trace
 ```mysql
-select mo_ctl("cn", "TraceSpan", "all:disbale:local,s3");
+select mo_ctl("cn", "TraceSpan", "all:disable:local,s3");
 select mo_ctl("dn", "TraceSpan", "disable:local,s3");
 ```
 
