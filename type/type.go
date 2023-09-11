@@ -12,9 +12,9 @@ const ReportsRootDir string = "./reports"
 const SrcDataDir string = "./src_data"
 
 func FillTypeDefault() {
-	if DstPort == "" {
-		DstPort = "11235"
-	}
+	//if DstPort == "" {
+	//	DstPort = "11235"
+	//}
 
 	if SrcPort == "" {
 		SrcPort = "6001"

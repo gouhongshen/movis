@@ -21,11 +21,13 @@ import (
 type OpType int
 
 const (
-	S3FSOperation    OpType = 0
-	LocalFSOperation OpType = 1
+	AllFSOperation   OpType = 0
+	S3FSOperation    OpType = 1
+	LocalFSOperation OpType = 2
 )
 
 var opType2Name = map[OpType]string{
+	AllFSOperation:   "allFSOperation",
 	S3FSOperation:    "s3FSOperation",
 	LocalFSOperation: "localFSOperation",
 }
@@ -61,10 +63,6 @@ func spanVisInit() {
 		spanObjReqThroughTimeData = make([]html.SignalLinePageData, 0)
 	}()
 
-	if spanVis != nil {
-		return
-	}
-
 	spanVis = new(SpanVis)
 
 	if _type.SourceFile != "" {
@@ -97,7 +95,15 @@ func (s *SpanVis) webReport(w http.ResponseWriter) {
 func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 	// user hope to generate a paper report
 	paperReportForSpanInfo(tt)
-	s.webReport(w)
+
+	if _type.DstPort != "" {
+		s.webReport(w)
+	}
+}
+
+func AnalysisSpanInfoWithoutHttp() {
+	LocalFSOperationHandler(nil, nil)
+	S3FSOperationHandler(nil, nil)
 }
 
 func LocalFSOperationHandler(w http.ResponseWriter, req *http.Request) {
@@ -141,7 +147,7 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 }
 
 func (s *SpanVis) saveCSV(tt OpType) {
-	name := fmt.Sprintf("./src_data/%s_%s.records", tt.String(), time.Now().String())
+	name := fmt.Sprintf("./src_data/%s_%s.csv", tt.String(), time.Now().String())
 	if err := os.MkdirAll(filepath.Dir(name), os.ModePerm); err != nil {
 		panic(err.Error())
 	}
@@ -177,6 +183,7 @@ func (s *SpanVis) PrepareData(tt OpType) {
 		// decode data from file
 		s.decodeCSV(tt)
 	}
+
 	condition := ""
 	if tt == S3FSOperation {
 		condition = "S3FS"
@@ -221,6 +228,9 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 	return
 }
 
+// visualize_ObjReadLatency records the spent time on every obj requests in time order.
+// the X-axis:	a prefix of obj name + request end time
+// the Y-axis:	time spend in millisecond
 func (s *SpanVis) visualize_ObjReadLatency(tt OpType) {
 	title := "Read"
 	data := s.readRecords
@@ -262,7 +272,7 @@ func (s *SpanVis) visualize_ObjReadLatency(tt OpType) {
 }
 
 func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration) {
-	// show object request num in every second
+	// show object request num in every duration
 	title := []string{"Read", "Write"}
 	data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
 	for round := range data {

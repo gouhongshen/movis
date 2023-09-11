@@ -15,6 +15,15 @@ func main() {
 
 	defer release()
 
+	run()
+}
+
+func run() {
+	if _type.DstPort == "" {
+		script.AnalysisSpanInfoWithoutHttp()
+		return
+	}
+
 	http.HandleFunc("/", rootHandler)
 	http.HandleFunc("/span_info", spanRoot)
 	http.HandleFunc("/span_info/s3_fs_operation", script.S3FSOperationHandler)
