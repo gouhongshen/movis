@@ -8,6 +8,7 @@ import (
 	_type "movis/type"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
@@ -98,6 +99,41 @@ func report(w io.Writer,
 	}
 
 	t.Render()
+
+	if len(labels) > 0 {
+		w.Write([]byte("\n"))
+
+		t = table.NewWriter()
+		t.SetOutputMirror(w)
+		t.AppendHeader(table.Row{"label", "val"})
+
+		t.AppendRow([]interface{}{"total", len(labels)})
+		t.AppendRow([]interface{}{"average", sum / float64(len(labels))})
+
+		nVals := make([]float64, len(values))
+		copy(nVals, values)
+		sort.Slice(nVals, func(i, j int) bool { return nVals[i] < nVals[j] })
+
+		t.AppendRow([]interface{}{"median", nVals[len(nVals)/2]})
+		t.AppendRow([]interface{}{"95-percent", nVals[len(nVals)*95/100]})
+
+		step := (nVals[len(nVals)-1] - nVals[0]) / 20
+		for i, j := 0, 0; i < len(nVals); {
+			cnt := 0
+			for j = i; j < len(nVals); j++ {
+				if nVals[i]+step >= nVals[j] {
+					cnt++
+				} else {
+					break
+				}
+			}
+			t.AppendRow([]interface{}{fmt.Sprintf("density_%d", i),
+				fmt.Sprintf("%.3f%s: %.3f", float64(cnt)/float64(len(nVals))*100, "%", nVals[j-1])})
+			i = j
+		}
+
+		t.Render()
+	}
 
 	w.Write([]byte("\n\n\n"))
 

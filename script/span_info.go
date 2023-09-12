@@ -48,10 +48,11 @@ var spanObjReadLatencyData []html.SignalLinePageData
 var renderData html.LinePageData
 
 type SpanVis struct {
-	db           *gorm.DB
-	infos        []_type.SpanInfoTable
-	readRecords  []_type.SpanInfoTable
-	writeRecords []_type.SpanInfoTable
+	db    *gorm.DB
+	infos []_type.SpanInfoTable
+	//readRecords  []_type.SpanInfoTable
+	//writeRecords []_type.SpanInfoTable
+	categories map[string][]_type.SpanInfoTable
 }
 
 var spanVis *SpanVis
@@ -59,8 +60,9 @@ var spanVis *SpanVis
 func spanVisInit() {
 	defer func() {
 		spanVis.infos = make([]_type.SpanInfoTable, 0)
-		spanVis.readRecords = make([]_type.SpanInfoTable, 0)
-		spanVis.writeRecords = make([]_type.SpanInfoTable, 0)
+		//spanVis.readRecords = make([]_type.SpanInfoTable, 0)
+		//spanVis.writeRecords = make([]_type.SpanInfoTable, 0)
+		spanVis.categories = make(map[string][]_type.SpanInfoTable)
 
 		renderData.Data = make([]html.SignalLinePageData, 0)
 		spanObjReadLatencyData = make([]html.SignalLinePageData, 0)
@@ -136,10 +138,6 @@ func DiskCacheOperationHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *SpanVis) decodeCSV(tt OpType) {
-	//if len(s.infos) != 0 {
-	//	return
-	//}
-
 	file, err := os.Open(_type.SourceFile)
 	if err != nil {
 		panic(err.Error())
@@ -162,8 +160,6 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 		info := _type.SpanInfoTable{}
 		for j := 0; j < len(heads); j++ {
 			info.SetVal(heads[j], records[i][j])
-			//vals := _type.SpanInfoMapTag2Values(&info)
-			//vals[heads[j]].Set(funcs[heads[j]](records[i][j]))
 		}
 
 		if info.SpanKind != tt.String() {
@@ -230,15 +226,21 @@ func (s *SpanVis) PrepareData(tt OpType) {
 			continue
 		}
 
-		if strings.HasSuffix(s.infos[idx].SpanName, "Write") ||
-			strings.HasSuffix(s.infos[idx].SpanName, "write") ||
-			strings.HasSuffix(s.infos[idx].SpanName, "Update") {
-			s.writeRecords = append(s.writeRecords, s.infos[idx])
-		} else if strings.HasSuffix(s.infos[idx].SpanName, "read") ||
-			strings.HasSuffix(s.infos[idx].SpanName, "Read") ||
-			strings.HasSuffix(s.infos[idx].SpanName, "Get") {
-			s.readRecords = append(s.readRecords, s.infos[idx])
-		}
+		//if _, ok := s.categories[name]; !ok {
+		//
+		//}
+
+		s.categories[s.infos[idx].SpanName] = append(s.categories[s.infos[idx].SpanName], s.infos[idx])
+
+		//if strings.HasSuffix(s.infos[idx].SpanName, "Write") ||
+		//	strings.HasSuffix(s.infos[idx].SpanName, "write") ||
+		//	strings.HasSuffix(s.infos[idx].SpanName, "Update") {
+		//	s.writeRecords = append(s.writeRecords, s.infos[idx])
+		//} else if strings.HasSuffix(s.infos[idx].SpanName, "read") ||
+		//	strings.HasSuffix(s.infos[idx].SpanName, "Read") ||
+		//	strings.HasSuffix(s.infos[idx].SpanName, "Get") {
+		//	s.readRecords = append(s.readRecords, s.infos[idx])
+		//}
 	}
 }
 
@@ -307,11 +309,11 @@ func (s *SpanVis) visualize_ObjReqLatency(tt OpType) {
 }
 
 func (s *SpanVis) barChartForLatency(tt OpType) {
-	title := []string{"Read", "Write"}
-	data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
+	//title := []string{"Read", "Write"}
+	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
 
-	for round := range data {
-		cnInfo, tnInfo := s.parseTNAndCN(data[round])
+	for name := range s.categories {
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
 
 		sort.Slice(cnInfo, func(i, j int) bool { return cnInfo[i].Duration < cnInfo[j].Duration })
 		sort.Slice(tnInfo, func(i, j int) bool { return tnInfo[i].Duration < tnInfo[j].Duration })
@@ -393,7 +395,7 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 				XAxis:     fmt.Sprintf("时延 (%s)", tag),
 				YAxis:     "数量",
 				ChartType: "bar",
-				Title:     st + "  " + tt.String() + "  " + title[round] + ":  Obj Read Latency",
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Latency",
 			})
 			return
 		}
@@ -407,14 +409,14 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 
 func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration) {
 	// show object request num in every duration
-	title := []string{"Read", "Write"}
-	data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
-	for round := range data {
-		sort.Slice(data[round], func(i, j int) bool {
-			return data[round][i].EndTime.Before(data[round][j].EndTime)
+	//title := []string{"Read", "Write"}
+	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
+	for name := range s.categories {
+		sort.Slice(s.categories[name], func(i, j int) bool {
+			return s.categories[name][i].EndTime.Before(s.categories[name][j].EndTime)
 		})
 
-		cnInfo, tnInfo := s.parseTNAndCN(data[round])
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
 		getData := func(info []_type.SpanInfoTable) ([]float64, []string) {
 			var cntByDuration []float64
 			var endTime []string
@@ -451,7 +453,7 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration)
 				XAxis:     "时间戳",
 				YAxis:     "object 访问数量",
 				ChartType: chartType,
-				Title:     st + "  " + tt.String() + "  " + title[round] + ":  Obj Req Through Time",
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Req Through Time",
 			})
 		}
 		values, labels := getData(cnInfo)
@@ -473,11 +475,11 @@ func (s *SpanVis) unmarshExtra(extra string) map[string]interface{} {
 }
 
 func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
-	title := []string{"Read", "Write"}
-	data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
+	//title := []string{"Read", "Write"}
+	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
 
-	for round, _ := range data {
-		cnInfo, tnInfo := s.parseTNAndCN(data[round])
+	for name, _ := range s.categories {
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
 
 		getData := func(info []_type.SpanInfoTable) (values []float64, labels []string) {
 			var objName []string
@@ -511,7 +513,7 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 				XAxis:     "object name",
 				YAxis:     "object 访问数量",
 				ChartType: chartType,
-				Title:     st + "  " + tt.String() + "  " + title[round] + ":  Obj Request Heatmap",
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Request Heatmap",
 			})
 		}
 
