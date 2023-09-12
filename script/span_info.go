@@ -44,6 +44,7 @@ func (op *OpType) String() string {
 var spanObjReqHeatmapData []html.SignalLinePageData
 var spanObjReqThroughTimeData []html.SignalLinePageData
 var spanObjReadLatencyData []html.SignalLinePageData
+var spanObjReqSizeThroughTimeData []html.SignalLinePageData
 
 var renderData html.LinePageData
 
@@ -60,14 +61,13 @@ var spanVis *SpanVis
 func spanVisInit() {
 	defer func() {
 		spanVis.infos = make([]_type.SpanInfoTable, 0)
-		//spanVis.readRecords = make([]_type.SpanInfoTable, 0)
-		//spanVis.writeRecords = make([]_type.SpanInfoTable, 0)
 		spanVis.categories = make(map[string][]_type.SpanInfoTable)
 
 		renderData.Data = make([]html.SignalLinePageData, 0)
 		spanObjReadLatencyData = make([]html.SignalLinePageData, 0)
 		spanObjReqHeatmapData = make([]html.SignalLinePageData, 0)
 		spanObjReqThroughTimeData = make([]html.SignalLinePageData, 0)
+		spanObjReqSizeThroughTimeData = make([]html.SignalLinePageData, 0)
 	}()
 
 	spanVis = new(SpanVis)
@@ -111,6 +111,8 @@ func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 func AnalysisSpanInfoWithoutHttp() {
 	LocalFSOperationHandler(nil, nil)
 	S3FSOperationHandler(nil, nil)
+	MemCacheOperationHandler(nil, nil)
+	DiskCacheOperationHandler(nil, nil)
 }
 
 func LocalFSOperationHandler(w http.ResponseWriter, req *http.Request) {
@@ -206,15 +208,9 @@ func (s *SpanVis) PrepareData(tt OpType) {
 		s.decodeCSV(tt)
 	}
 
-	// here, we also save the data read from db as CSV file
+	// here, we also save the data as CSV file, break the big records file into
+	// separate files according to the OpType
 	s.saveCSV(tt)
-
-	//condition := ""
-	//if tt == S3FSOperation {
-	//	condition = "S3FS"
-	//} else {
-	//	condition = "LocalFS"
-	//}
 
 	for idx, _ := range s.infos {
 		var extra map[string]interface{}
@@ -226,21 +222,8 @@ func (s *SpanVis) PrepareData(tt OpType) {
 			continue
 		}
 
-		//if _, ok := s.categories[name]; !ok {
-		//
-		//}
-
 		s.categories[s.infos[idx].SpanName] = append(s.categories[s.infos[idx].SpanName], s.infos[idx])
 
-		//if strings.HasSuffix(s.infos[idx].SpanName, "Write") ||
-		//	strings.HasSuffix(s.infos[idx].SpanName, "write") ||
-		//	strings.HasSuffix(s.infos[idx].SpanName, "Update") {
-		//	s.writeRecords = append(s.writeRecords, s.infos[idx])
-		//} else if strings.HasSuffix(s.infos[idx].SpanName, "read") ||
-		//	strings.HasSuffix(s.infos[idx].SpanName, "Read") ||
-		//	strings.HasSuffix(s.infos[idx].SpanName, "Get") {
-		//	s.readRecords = append(s.readRecords, s.infos[idx])
-		//}
 	}
 }
 
@@ -249,6 +232,7 @@ func (s *SpanVis) visualize(tt OpType) {
 	s.visualize_ObjReqHeatmap(tt)
 	s.visualize_ObjReqThroughTime(tt, time.Second*10)
 	s.visualize_ObjReqLatency(tt)
+	s.visualize_ObjReqSizeChanges(tt)
 }
 
 func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_type.SpanInfoTable) {
@@ -263,55 +247,134 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 	return
 }
 
+func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType) {
+	// collecting object size changes over time in every minute
+	for name := range s.categories {
+		sort.Slice(s.categories[name], func(i, j int) bool {
+			return s.categories[name][i].EndTime.Before(s.categories[name][j].EndTime)
+		})
+
+		getData := func(info []_type.SpanInfoTable) (labels []string, values []float64, tag string) {
+			if len(info) <= 0 {
+				return
+			}
+
+			tag = "KB"
+			kb := float64(1024)
+
+			for i, j := 0, 0; i < len(info); {
+				sumSize := float64(0)
+				for j = i; j < len(info); j++ {
+					gapDur := info[j].EndTime.Sub(info[i].EndTime)
+					if gapDur > time.Minute {
+						break
+					}
+					extra := s.unmarshExtra(info[j].Extra)
+					sumSize += extra["size"].(float64)
+				}
+
+				labels = append(labels, info[j-1].EndTime.String())
+				values = append(values, sumSize/float64(j-i)/kb)
+				i = j
+			}
+			return labels, values, tag
+		}
+
+		appendData := func(st string, labels []string, values []float64, chartType string, tTag string) {
+			spanObjReqSizeThroughTimeData = append(spanObjReqSizeThroughTimeData, html.SignalLinePageData{
+				Labels:    labels,
+				Values:    values,
+				XAxis:     "时间戳",
+				YAxis:     fmt.Sprintf("每分钟 object size 平均值 (%s)", tTag),
+				ChartType: chartType,
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Size",
+			})
+		}
+
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
+		labels, values, tag := getData(cnInfo)
+		appendData("CN", labels, values, "line", tag)
+
+		labels, values, tag = getData(tnInfo)
+		appendData("TN", labels, values, "line", tag)
+	}
+
+	s.appendToRenderData(spanObjReqSizeThroughTimeData)
+}
+
 // visualize_ObjReadLatency records the spent time on every obj requests in time order.
 // the X-axis:	a prefix of obj name + request end time
 // the Y-axis:	time spend in millisecond
 func (s *SpanVis) visualize_ObjReqLatency(tt OpType) {
-	//title := "Read"
-	//data := s.readRecords
-	//
-	//sort.Slice(data, func(i, j int) bool {
-	//	return data[i].EndTime.Before(data[j].EndTime)
-	//})
-	//
-	//cnInfo, tnInfo := s.parseTNAndCN(data)
-	//getData := func(info []_type.SpanInfoTable) (values []float64, labels []string) {
-	//	for idx := range info {
-	//		extra := s.unmarshExtra(info[idx].Extra)
-	//		name := extra["name"].(string)
-	//		labels = append(labels, strings.Split(name, "-")[0]+" # "+info[idx].EndTime.String())
-	//		// time.Millisecond
-	//		values = append(values, float64(info[idx].Duration/(1000*1000)))
-	//	}
-	//	return
-	//}
-	//
-	//appendData := func(st string, labels []string, values []float64, chartType string, tTag string) {
-	//	spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
-	//		Labels:    labels,
-	//		Values:    values,
-	//		XAxis:     "时间戳",
-	//		YAxis:     fmt.Sprintf("时延 (%s)", tTag),
-	//		ChartType: chartType,
-	//		Title:     st + "  " + tt.String() + "  " + title + ":  Obj Read Latency",
-	//	})
-	//}
-	//
-	//values, labels := getData(cnInfo)
-	//appendData("CN", labels, values, "line", "ms")
-	//
-	//values, labels = getData(tnInfo)
-	//appendData("TN", labels, values, "line", "ms")
-	//
-	//s.appendToRenderData(spanObjReadLatencyData)
+	// collecting latency changes over time in every minute
+	for name := range s.categories {
+		sort.Slice(s.categories[name], func(i, j int) bool {
+			return s.categories[name][i].EndTime.Before(s.categories[name][j].EndTime)
+		})
+
+		getData := func(info []_type.SpanInfoTable) (labels []string, values []float64, tag string) {
+			if len(info) <= 0 {
+				return
+			}
+
+			var avg float64
+			for i := range info {
+				avg += float64(info[i].Duration)
+			}
+			avg /= float64(len(info))
+
+			if avg < 1000 {
+				avg = 1 // ns
+				tag = "ns"
+			} else if avg < 1000*1000 {
+				avg = 1000 // us
+				tag = "us"
+			} else {
+				avg = 1000 * 1000 // ms
+				tag = "ms"
+			}
+
+			for i, j := 0, 0; i < len(info); {
+				sumDur := int64(0)
+				for j = i; j < len(info); j++ {
+					gapDur := info[j].EndTime.Sub(info[i].EndTime)
+					if gapDur > time.Minute {
+						break
+					}
+					sumDur += info[j].Duration
+				}
+
+				labels = append(labels, info[j-1].EndTime.String())
+				values = append(values, float64(sumDur)/float64(j-i)/avg)
+				i = j
+			}
+			return labels, values, tag
+		}
+
+		appendData := func(st string, labels []string, values []float64, chartType string, tTag string) {
+			spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
+				Labels:    labels,
+				Values:    values,
+				XAxis:     "时间戳",
+				YAxis:     fmt.Sprintf("每分钟时延平均值 (%s)", tTag),
+				ChartType: chartType,
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Latency",
+			})
+		}
+
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
+		labels, values, tag := getData(cnInfo)
+		appendData("CN", labels, values, "line", tag)
+
+		labels, values, tag = getData(tnInfo)
+		appendData("TN", labels, values, "line", tag)
+
+	}
 
 	s.barChartForLatency(tt)
 }
 
 func (s *SpanVis) barChartForLatency(tt OpType) {
-	//title := []string{"Read", "Write"}
-	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
-
 	for name := range s.categories {
 		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
 
@@ -409,8 +472,6 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 
 func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration) {
 	// show object request num in every duration
-	//title := []string{"Read", "Write"}
-	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
 	for name := range s.categories {
 		sort.Slice(s.categories[name], func(i, j int) bool {
 			return s.categories[name][i].EndTime.Before(s.categories[name][j].EndTime)
@@ -475,9 +536,6 @@ func (s *SpanVis) unmarshExtra(extra string) map[string]interface{} {
 }
 
 func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
-	//title := []string{"Read", "Write"}
-	//data := [][]_type.SpanInfoTable{s.readRecords, s.writeRecords}
-
 	for name, _ := range s.categories {
 		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
 

@@ -127,8 +127,9 @@ func report(w io.Writer,
 					break
 				}
 			}
-			t.AppendRow([]interface{}{fmt.Sprintf("density_%d", i),
-				fmt.Sprintf("%.3f%s: %.3f", float64(cnt)/float64(len(nVals))*100, "%", nVals[j-1])})
+			t.AppendRow([]interface{}{fmt.Sprintf("density_%02d", i),
+				fmt.Sprintf("%6.3f%s: [%6.3f, %6.3f]", float64(cnt)/float64(len(nVals))*100, "%",
+					nVals[i], nVals[j-1])})
 			i = j
 		}
 
