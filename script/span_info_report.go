@@ -128,6 +128,8 @@ func report(w io.Writer,
 		sort.Slice(nVals, func(i, j int) bool { return nVals[i] < nVals[j] })
 
 		t.AppendRow([]interface{}{"median", nVals[len(nVals)/2]})
+		t.AppendRow([]interface{}{"maximum", nVals[len(nVals)-1]})
+		t.AppendRow([]interface{}{"minimum", nVals[0]})
 		t.AppendRow([]interface{}{"95-percent", nVals[len(nVals)*95/100]})
 
 		step := (nVals[len(nVals)-1] - nVals[0]) / 20

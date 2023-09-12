@@ -448,8 +448,8 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 			}
 
 			for i := range rang {
-				labels = append(labels, fmt.Sprintf("%.1f-%.1f # %.1f # %.3f",
-					rang[i][0]/avg, rang[i][1]/avg, values[i], values[i]/float64(len(info))*100))
+				labels = append(labels, fmt.Sprintf("%.1f-%.1f(%s) # %.1f # %.3f%s",
+					rang[i][0]/avg, rang[i][1]/avg, tag, values[i], values[i]/float64(len(info))*100), "%")
 			}
 
 			spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{

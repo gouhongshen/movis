@@ -32,6 +32,12 @@ func SpanInfoTableCSVHead() []string {
 	}
 }
 
+//select trace_id, span_id, parent_span_id, span_kind, node_uuid, node_type,
+//span_name, DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s.%f') AS start_time,
+//DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s.%f') AS end_time, duration, resource, extra from
+//system.span_info where span_kind="s3FSOperation"
+//into outfile '/tmp/output_eks.csv' FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n';
+
 func (s *SpanInfoTable) SetVal(name string, val string) {
 	switch name {
 	case "trace_id":
@@ -49,9 +55,17 @@ func (s *SpanInfoTable) SetVal(name string, val string) {
 	case "span_name":
 		s.SpanName = val
 	case "start_time":
-		s.StartTime, _ = time.Parse("2006-01-02 15:04:05", val)
+		var err error
+		s.StartTime, err = time.Parse("2006-01-02 15:04:05.999999", val)
+		if err != nil {
+			fmt.Println("parse start time: ", err.Error())
+		}
 	case "end_time":
-		s.EndTime, _ = time.Parse("2006-01-02 15:04:05", val)
+		var err error
+		s.EndTime, err = time.Parse("2006-01-02 15:04:05.999999", val)
+		if err != nil {
+			fmt.Println("parse end time: ", err.Error())
+		}
 	case "duration":
 		dur, err := strconv.Atoi(val)
 		if err != nil {
@@ -68,10 +82,14 @@ func (s *SpanInfoTable) SetVal(name string, val string) {
 }
 
 func SpanInfoTableRow2Str(info *SpanInfoTable) []string {
+	start := info.StartTime.Format("2006-01-02 15:04:05.999999")
+	end := info.EndTime.Format("2006-01-02 15:04:05.999999")
+
 	return []string{
 		info.TraceId, info.SpanId, info.ParentSpanId, info.SpanKind,
-		info.NodeUUID, info.NodeType, info.SpanName, info.StartTime.String(),
-		info.EndTime.String(), strconv.FormatInt(info.Duration, 10),
+		info.NodeUUID, info.NodeType, info.SpanName, start,
+		end, strconv.FormatInt(info.Duration, 10),
 		info.Resource, info.Extra,
 	}
+
 }
