@@ -154,7 +154,7 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 	}
 
 	heads := records[0]
-	for i := 0; i < len(records); i++ {
+	for i := 1; i < len(records); i++ {
 		//records, err := reader.Read()
 		if err != nil {
 			return
@@ -173,7 +173,7 @@ func (s *SpanVis) decodeCSV(tt OpType) {
 }
 
 func (s *SpanVis) saveCSV(tt OpType) {
-	name := fmt.Sprintf("./src_data/%s_%s.csv", tt.String(), time.Now().String())
+	name := fmt.Sprintf("./src_data/%s_%d.csv", tt.String(), time.Now().UnixMilli())
 	if err := os.MkdirAll(filepath.Dir(name), os.ModePerm); err != nil {
 		panic(err.Error())
 	}
