@@ -391,9 +391,6 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 			return
 		}
 
-		cnDurs, cnAvg := getDurs(cnInfo)
-		tnDurs, tnAvg := getDurs(tnInfo)
-
 		process := func(info []_type.SpanInfoTable, durs []float64, avg float64,
 			st string) (values []float64, labels []string) {
 
@@ -438,18 +435,21 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 			}
 
 			values = make([]float64, len(rang))
-			for i := range rang {
-				for j := range info {
+			i, j = 0, 0
+			for ; i < len(rang); i++ {
+				for ; j < len(info); j++ {
 					duration := float64(info[j].Duration)
 					if duration >= rang[i][0] && duration < rang[i][1] {
 						values[i]++
+					} else {
+						break
 					}
 				}
 			}
 
 			for i := range rang {
 				labels = append(labels, fmt.Sprintf("%.1f-%.1f(%s) # %.1f # %.3f%s",
-					rang[i][0]/avg, rang[i][1]/avg, tag, values[i], values[i]/float64(len(info))*100), "%")
+					rang[i][0]/avg, rang[i][1]/avg, tag, values[i], values[i]/float64(len(info))*100, "%"))
 			}
 
 			spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
@@ -462,6 +462,9 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 			})
 			return
 		}
+
+		cnDurs, cnAvg := getDurs(cnInfo)
+		tnDurs, tnAvg := getDurs(tnInfo)
 
 		process(cnInfo, cnDurs, cnAvg, "CN")
 		process(tnInfo, tnDurs, tnAvg, "TN")
