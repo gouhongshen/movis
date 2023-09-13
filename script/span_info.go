@@ -284,8 +284,8 @@ func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType) {
 			spanObjReqSizeThroughTimeData = append(spanObjReqSizeThroughTimeData, html.SignalLinePageData{
 				Labels:    labels,
 				Values:    values,
-				XAxis:     "时间戳",
-				YAxis:     fmt.Sprintf("每分钟 object size 平均值 (%s)", tTag),
+				XAxis:     "timestamp",
+				YAxis:     fmt.Sprintf("average object size over minutes (%s)", tTag),
 				ChartType: chartType,
 				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Size",
 			})
@@ -355,8 +355,8 @@ func (s *SpanVis) visualize_ObjReqLatency(tt OpType) {
 			spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
 				Labels:    labels,
 				Values:    values,
-				XAxis:     "时间戳",
-				YAxis:     fmt.Sprintf("每分钟时延平均值 (%s)", tTag),
+				XAxis:     "timestamp",
+				YAxis:     fmt.Sprintf("average latency over minutes (%s)", tTag),
 				ChartType: chartType,
 				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Latency",
 			})
@@ -455,8 +455,8 @@ func (s *SpanVis) barChartForLatency(tt OpType) {
 			spanObjReadLatencyData = append(spanObjReadLatencyData, html.SignalLinePageData{
 				Labels:    labels,
 				Values:    values,
-				XAxis:     fmt.Sprintf("时延 (%s)", tag),
-				YAxis:     "数量",
+				XAxis:     fmt.Sprintf("latency (%s)", tag),
+				YAxis:     "numbers",
 				ChartType: "bar",
 				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Read Latency",
 			})
@@ -514,8 +514,8 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration time.Duration)
 			spanObjReqThroughTimeData = append(spanObjReqThroughTimeData, html.SignalLinePageData{
 				Labels:    labels,
 				Values:    values,
-				XAxis:     "时间戳",
-				YAxis:     "object 访问数量",
+				XAxis:     "timestamp",
+				YAxis:     "object requested numbers",
 				ChartType: chartType,
 				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Req Through Time",
 			})
@@ -572,7 +572,7 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 				Labels:    labels,
 				Values:    values,
 				XAxis:     "object name",
-				YAxis:     "object 访问数量",
+				YAxis:     "object requested numbers",
 				ChartType: chartType,
 				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Request Heatmap",
 			})

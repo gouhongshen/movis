@@ -28,6 +28,8 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqHeatmapData[idx].Labels,
 			spanObjReqHeatmapData[idx].Values,
 			spanObjReqHeatmapData[idx].Title,
+			spanObjReqHeatmapData[idx].XAxis,
+			spanObjReqHeatmapData[idx].YAxis,
 			func(s string) bool {
 				if len(s) == 0 {
 					return false
@@ -41,6 +43,8 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqThroughTimeData[idx].Labels,
 			spanObjReqThroughTimeData[idx].Values,
 			spanObjReqThroughTimeData[idx].Title,
+			spanObjReqThroughTimeData[idx].XAxis,
+			spanObjReqThroughTimeData[idx].YAxis,
 			func(s string) bool {
 				if len(s) < 1 {
 					return false
@@ -54,6 +58,8 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReadLatencyData[idx].Labels,
 			spanObjReadLatencyData[idx].Values,
 			spanObjReadLatencyData[idx].Title,
+			spanObjReadLatencyData[idx].XAxis,
+			spanObjReadLatencyData[idx].YAxis,
 			func(s string) bool {
 				if len(s) < 1 {
 					return false
@@ -67,6 +73,8 @@ func paperReportForSpanInfo(tt OpType) {
 			spanObjReqSizeThroughTimeData[idx].Labels,
 			spanObjReqSizeThroughTimeData[idx].Values,
 			spanObjReqSizeThroughTimeData[idx].Title,
+			spanObjReqSizeThroughTimeData[idx].XAxis,
+			spanObjReqSizeThroughTimeData[idx].YAxis,
 			func(s string) bool {
 				if len(s) < 1 {
 					return false
@@ -90,9 +98,10 @@ func getBar(v float64, sum float64) string {
 
 func report(w io.Writer,
 	labels []string, values []float64, title string,
+	xaxis string, yaxis string,
 	accept func(string) bool) {
 	// assumed that values has descending order
-	w.Write([]byte(title + "\n\n"))
+	w.Write([]byte(title + "\n" + "x-axis: " + xaxis + "; y-axis: " + yaxis + "\n\n"))
 
 	t := table.NewWriter()
 	t.SetOutputMirror(w)
