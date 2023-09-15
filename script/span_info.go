@@ -45,6 +45,7 @@ var spanObjReqHeatmapData []html.SignalLinePageData
 var spanObjReqThroughTimeData []html.SignalLinePageData
 var spanObjReadLatencyData []html.SignalLinePageData
 var spanObjReqSizeThroughTimeData []html.SignalLinePageData
+var spanObjReqStackInfoData []html.SignalLinePageData
 
 var renderData html.LinePageData
 
@@ -68,6 +69,8 @@ func spanVisInit() {
 		spanObjReqHeatmapData = make([]html.SignalLinePageData, 0)
 		spanObjReqThroughTimeData = make([]html.SignalLinePageData, 0)
 		spanObjReqSizeThroughTimeData = make([]html.SignalLinePageData, 0)
+
+		spanObjReqStackInfoData = make([]html.SignalLinePageData, 0)
 	}()
 
 	spanVis = new(SpanVis)
@@ -233,6 +236,7 @@ func (s *SpanVis) visualize(tt OpType) {
 	s.visualize_ObjReqThroughTime(tt, time.Second*10)
 	s.visualize_ObjReqLatency(tt)
 	s.visualize_ObjReqSizeChanges(tt)
+	s.visualize_ObjReqStackInfo(tt)
 }
 
 func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_type.SpanInfoTable) {
@@ -245,6 +249,47 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 		}
 	}
 	return
+}
+
+func (s *SpanVis) visualize_ObjReqStackInfo(tt OpType) {
+	for name := range s.categories {
+
+		getData := func(info []_type.SpanInfoTable) (labels []string, values []float64) {
+			stack2Cnt := make(map[string]float64)
+			for idx := range info {
+				extra := s.unmarshExtra(info[idx].Extra)
+				stack2Cnt[extra["stack"].(string)]++
+			}
+
+			for k, v := range stack2Cnt {
+				labels = append(labels, k)
+				values = append(values, v)
+			}
+
+			return
+		}
+
+		appendData := func(st string, labels []string, values []float64, chartType string, tTag string) {
+			spanObjReqStackInfoData = append(spanObjReqStackInfoData, html.SignalLinePageData{
+				Labels:    labels,
+				Values:    values,
+				XAxis:     "numbers",
+				YAxis:     "stack info",
+				ChartType: chartType,
+				Title:     st + "  " + tt.String() + "  " + name + ":  Obj Request Stack",
+			})
+		}
+
+		cnInfo, tnInfo := s.parseTNAndCN(s.categories[name])
+
+		labels, values := getData(cnInfo)
+		appendData("CN", labels, values, "line", "")
+
+		labels, values = getData(tnInfo)
+		appendData("TN", labels, values, "line", "")
+	}
+
+	// no need to append to render
 }
 
 func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType) {

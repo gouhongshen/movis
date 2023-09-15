@@ -13,7 +13,7 @@ import (
 )
 
 func paperReportForSpanInfo(tt OpType) {
-	path := fmt.Sprintf("%sreport_%d.report", _type.SpanReportDir, time.Now().UnixMilli())
+	path := fmt.Sprintf("%s%s_%d.report", _type.SpanReportDir, tt.String(), time.Now().UnixMilli())
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		panic(err.Error())
 	}
@@ -79,6 +79,18 @@ func paperReportForSpanInfo(tt OpType) {
 				if len(s) < 1 {
 					return false
 				}
+				return true
+			})
+	}
+
+	for idx := range spanObjReqStackInfoData {
+		report(file,
+			spanObjReqStackInfoData[idx].Labels,
+			spanObjReqStackInfoData[idx].Values,
+			spanObjReqStackInfoData[idx].Title,
+			spanObjReqStackInfoData[idx].XAxis,
+			spanObjReqStackInfoData[idx].YAxis,
+			func(s string) bool {
 				return true
 			})
 	}
