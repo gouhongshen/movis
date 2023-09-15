@@ -13,7 +13,7 @@ import (
 )
 
 func paperReportForSpanInfo(tt OpType) {
-	path := fmt.Sprintf("%sreport_%d.report", _type.SpanReportDir, time.Now().UnixMilli())
+	path := fmt.Sprintf("%s%sreport_%d.report", _type.SpanReportDir, tt.String(), time.Now().UnixMilli())
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
 		panic(err.Error())
 	}

@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -202,7 +201,10 @@ func (s *SpanVis) saveCSV(tt OpType) {
 
 func (s *SpanVis) PrepareData(tt OpType) {
 	if _type.SourceFile == "" {
-		s.db.Table("span_info").Where(fmt.Sprintf("span_kind='%s'", tt.String())).Find(&s.infos)
+		// for test
+		where := fmt.Sprintf("span_kind='statement'")
+		//s.db.Table("span_info").Where(fmt.Sprintf("span_kind='%s'", tt.String())).Find(&s.infos)
+		s.db.Table("span_info").Where(where).Find(&s.infos)
 	} else {
 		// decode data from file
 		s.decodeCSV(tt)
@@ -218,9 +220,9 @@ func (s *SpanVis) PrepareData(tt OpType) {
 			fmt.Println(fmt.Errorf(err.Error()))
 		}
 
-		if strings.HasSuffix(extra["name"].(string), ".csv") {
-			continue
-		}
+		//if strings.HasSuffix(extra["name"].(string), ".csv") {
+		//	continue
+		//}
 
 		s.categories[s.infos[idx].SpanName] = append(s.categories[s.infos[idx].SpanName], s.infos[idx])
 
@@ -229,10 +231,11 @@ func (s *SpanVis) PrepareData(tt OpType) {
 
 func (s *SpanVis) visualize(tt OpType) {
 	s.PrepareData(tt)
-	s.visualize_ObjReqHeatmap(tt)
-	s.visualize_ObjReqThroughTime(tt, time.Second*10)
-	s.visualize_ObjReqLatency(tt)
-	s.visualize_ObjReqSizeChanges(tt)
+	//s.visualize_ObjReqHeatmap(tt)
+	//s.visualize_ObjReqThroughTime(tt, time.Second*10)
+	//s.visualize_ObjReqLatency(tt)
+	//s.visualize_ObjReqSizeChanges(tt)
+	s.visualize_Statement(tt)
 }
 
 func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_type.SpanInfoTable) {
@@ -245,6 +248,100 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 		}
 	}
 	return
+}
+
+func (s *SpanVis) visualize_Statement(tt OpType) {
+	tarInfos := map[string][]*_type.SpanInfoTable{
+		"Compile.Compile":             {},
+		"MysqlCmdExecutor.doComQuery": {},
+		"mergeReader.Read":            {},
+		"Compile.Run":                 {},
+	}
+
+	for name := range s.categories {
+		if _, ok := tarInfos[name]; !ok {
+			continue
+		}
+
+		for idx := range s.categories[name] {
+			if s.categories[name][idx].NodeType != "CN" {
+				continue
+			}
+
+			tarInfos[name] = append(tarInfos[name], &s.categories[name][idx])
+		}
+	}
+
+	var groups []struct {
+		ReadDurs    []float64
+		RunDurs     float64
+		CompileDurs float64
+		QueryDurs   float64
+	}
+
+	for _, v := range tarInfos {
+		sort.Slice(v, func(i, j int) bool {
+			return v[i].TraceId < v[j].TraceId
+		})
+	}
+
+	for j, i := 0, 0; i < len(tarInfos["mergeReader.Read"]); {
+		var durs []float64
+		for j = i; j < len(tarInfos["mergeReader.Read"]); j++ {
+			if tarInfos["mergeReader.Read"][j].TraceId != tarInfos["mergeReader.Read"][i].TraceId {
+				break
+			}
+			durs = append(durs, float64(tarInfos["mergeReader.Read"][j].Duration))
+		}
+
+		curName := "Compile.Compile"
+		idx1 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
+			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
+		})
+
+		if idx1 == len(tarInfos[curName]) {
+			i = j
+			continue
+		}
+
+		curName = "MysqlCmdExecutor.doComQuery"
+		idx2 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
+			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
+		})
+
+		if idx2 == len(tarInfos[curName]) {
+			i = j
+			continue
+		}
+
+		curName = "Compile.Run"
+		idx3 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
+			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
+		})
+
+		if idx3 == len(tarInfos[curName]) {
+			i = j
+			continue
+		}
+
+		groups = append(groups, struct {
+			ReadDurs    []float64
+			RunDurs     float64
+			CompileDurs float64
+			QueryDurs   float64
+		}{
+			ReadDurs: durs, RunDurs: float64(tarInfos["Compile.Run"][idx3].Duration),
+			CompileDurs: float64(tarInfos["Compile.Compile"][idx1].Duration),
+			QueryDurs:   float64(tarInfos["MysqlCmdExecutor.doComQuery"][idx2].Duration)})
+
+		i = j
+
+	}
+
+	for i := range groups {
+		fmt.Println(groups[i].QueryDurs, groups[i].CompileDurs, groups[i].RunDurs, groups[i].ReadDurs)
+	}
+
 }
 
 func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType) {
