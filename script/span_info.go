@@ -202,7 +202,7 @@ func (s *SpanVis) saveCSV(tt OpType) {
 func (s *SpanVis) PrepareData(tt OpType) {
 	if _type.SourceFile == "" {
 		// for test
-		where := fmt.Sprintf("span_kind='statement'")
+		where := fmt.Sprintf("span_kind='statement' and node_type='CN'")
 		//s.db.Table("span_info").Where(fmt.Sprintf("span_kind='%s'", tt.String())).Find(&s.infos)
 		s.db.Table("span_info").Where(where).Find(&s.infos)
 	} else {
@@ -251,11 +251,15 @@ func (s *SpanVis) parseTNAndCN(data []_type.SpanInfoTable) (cnInfo, tnInfo []_ty
 }
 
 func (s *SpanVis) visualize_Statement(tt OpType) {
-	tarInfos := map[string][]*_type.SpanInfoTable{
-		"Compile.Compile":             {},
-		"MysqlCmdExecutor.doComQuery": {},
-		"mergeReader.Read":            {},
-		"Compile.Run":                 {},
+	names := []string{
+		"mergeReader.Read", "Compile.Compile",
+		"Compile.Run",
+	}
+	tarInfos := map[string]map[string][]*_type.SpanInfoTable{
+		names[0]: {},
+		names[1]: {},
+		names[2]: {},
+		//names[3]: {},
 	}
 
 	for name := range s.categories {
@@ -268,78 +272,33 @@ func (s *SpanVis) visualize_Statement(tt OpType) {
 				continue
 			}
 
-			tarInfos[name] = append(tarInfos[name], &s.categories[name][idx])
+			tarInfos[name][s.categories[name][idx].TraceId] = append(tarInfos[name][s.categories[name][idx].TraceId], &s.categories[name][idx])
 		}
 	}
 
-	var groups []struct {
-		ReadDurs    []float64
-		RunDurs     float64
-		CompileDurs float64
-		QueryDurs   float64
-	}
-
-	for _, v := range tarInfos {
-		sort.Slice(v, func(i, j int) bool {
-			return v[i].TraceId < v[j].TraceId
-		})
-	}
-
-	for j, i := 0, 0; i < len(tarInfos["mergeReader.Read"]); {
-		var durs []float64
-		for j = i; j < len(tarInfos["mergeReader.Read"]); j++ {
-			if tarInfos["mergeReader.Read"][j].TraceId != tarInfos["mergeReader.Read"][i].TraceId {
-				break
+	for tid := range tarInfos[names[0]] {
+		for range tarInfos[names[0]][tid] {
+			var durs []float64
+			for x := 1; x < 3; x++ {
+				p := tarInfos[names[x]][tid]
+				if len(p) != 1 {
+					break
+				}
+				durs = append(durs, float64(p[0].Duration))
 			}
-			durs = append(durs, float64(tarInfos["mergeReader.Read"][j].Duration))
+
+			if len(durs) != 2 {
+				continue
+			}
+
+			sum := int64(0)
+			for _, sp := range tarInfos[names[0]][tid] {
+				sum += sp.Duration
+			}
+
+			f := float64(1000 * 1000)
+			fmt.Println(durs[0]/f, durs[1]/f, float64(sum)/f)
 		}
-
-		curName := "Compile.Compile"
-		idx1 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
-			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
-		})
-
-		if idx1 == len(tarInfos[curName]) {
-			i = j
-			continue
-		}
-
-		curName = "MysqlCmdExecutor.doComQuery"
-		idx2 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
-			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
-		})
-
-		if idx2 == len(tarInfos[curName]) {
-			i = j
-			continue
-		}
-
-		curName = "Compile.Run"
-		idx3 := sort.Search(len(tarInfos[curName]), func(idx int) bool {
-			return tarInfos[curName][idx].TraceId == tarInfos["mergeReader.Read"][i].TraceId
-		})
-
-		if idx3 == len(tarInfos[curName]) {
-			i = j
-			continue
-		}
-
-		groups = append(groups, struct {
-			ReadDurs    []float64
-			RunDurs     float64
-			CompileDurs float64
-			QueryDurs   float64
-		}{
-			ReadDurs: durs, RunDurs: float64(tarInfos["Compile.Run"][idx3].Duration),
-			CompileDurs: float64(tarInfos["Compile.Compile"][idx1].Duration),
-			QueryDurs:   float64(tarInfos["MysqlCmdExecutor.doComQuery"][idx2].Duration)})
-
-		i = j
-
-	}
-
-	for i := range groups {
-		fmt.Println(groups[i].QueryDurs, groups[i].CompileDurs, groups[i].RunDurs, groups[i].ReadDurs)
 	}
 
 }
