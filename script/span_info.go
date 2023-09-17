@@ -141,11 +141,58 @@ func DiskCacheOperationHandler(w http.ResponseWriter, req *http.Request) {
 
 func (s *SpanVis) visualize(tt OpType) {
 	//s.PrepareData(tt)
-	s.visualize_ObjReqHeatmap(tt)
-	s.visualize_ObjReqThroughTime(tt, 30)
-	s.visualize_ObjReqLatency(tt, 30)
-	s.visualize_ObjReqSizeChanges(tt, 30)
-	s.visualize_ObjReqStackInfo(tt)
+	//s.visualize_ObjReqHeatmap(tt)
+	//s.visualize_ObjReqThroughTime(tt, 30)
+	//s.visualize_ObjReqLatency(tt, 30)
+	//s.visualize_ObjReqSizeChanges(tt, 30)
+	//s.visualize_ObjReqStackInfo(tt)
+	s.visualize_StatementSpent(tt)
+}
+
+func (s *SpanVis) visualize_StatementSpent(tt OpType) {
+	ret := make(map[string]map[string][]struct {
+		stm      string
+		duration float64
+	})
+	for _, nt := range NodeType {
+		var traceIds []string
+		s.db.Table("span_info").Select("distinct(trace_id)").
+			Where(fmt.Sprintf("span_kind='statement' and node_type='%s'", nt)).
+			Limit(1000).Find(&traceIds)
+
+		for _, id := range traceIds {
+			var data []struct {
+				SpanName string
+				Duration float64
+				Extra    string
+			}
+
+			s.db.Table("span_info").Select("span_name, duration, extra").
+				Where(fmt.Sprintf("span_kind='statement' and trace_id='%s'", id)).
+				Order("span_name").Find(&data)
+
+			tmp := make(map[string]float64)
+			stm := make(map[string]string)
+			for i := range data {
+				tmp[data[i].SpanName] += data[i].Duration
+				stm[data[i].SpanName] = data[i].Extra
+			}
+
+			for k, _ := range tmp {
+				if p := ret[nt]; p == nil {
+					ret[nt] = make(map[string][]struct {
+						stm      string
+						duration float64
+					})
+				}
+				ret[nt][k] = append(ret[nt][k], struct {
+					stm      string
+					duration float64
+				}{stm[k], tmp[k] / (1000 * 1000)})
+			}
+		}
+	}
+	reportStatement(ret)
 }
 
 func (s *SpanVis) visualize_ObjReqStackInfo(tt OpType) {

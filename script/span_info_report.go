@@ -175,3 +175,67 @@ func report(w io.Writer,
 	w.Write([]byte("\n\n\n"))
 
 }
+
+func reportStatement(
+	data map[string]map[string][]struct {
+	stm      string
+	duration float64
+}) {
+
+	path := fmt.Sprintf("%s%s_%d.report", _type.SpanReportDir, "statement", time.Now().UnixMilli())
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		panic(err.Error())
+	}
+
+	w, err := os.Create(path)
+	if err != nil {
+		log.Panicf(err.Error())
+	}
+
+	for k, _ := range data {
+		w.Write([]byte(k + " statement " + "\n\n"))
+		var spanNames []string
+		var hh table.Row
+		for n, _ := range data[k] {
+			spanNames = append(spanNames, n)
+			hh = append(hh, n)
+		}
+
+		t := table.NewWriter()
+		t.SetOutputMirror(w)
+		t.AppendHeader(hh)
+
+		idx := 0
+		for {
+			stm := ""
+			c := false
+			var durs []float64
+			for _, n := range spanNames {
+				if len(data[k][n]) <= idx {
+					durs = append(durs, -1)
+				} else {
+					durs = append(durs, data[k][n][idx].duration)
+					stm = data[k][n][idx].stm
+					c = true
+				}
+			}
+
+			if !c {
+				break
+			}
+			idx++
+
+			var row table.Row
+			for j := range durs {
+				row = append(row, durs[j])
+			}
+			row = append(row, stm)
+			t.AppendRow(row)
+		}
+
+		t.Render()
+		w.Write([]byte("\n\n"))
+	}
+
+	w.Close()
+}
