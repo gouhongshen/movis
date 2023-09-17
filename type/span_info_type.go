@@ -32,12 +32,6 @@ func SpanInfoTableCSVHead() []string {
 	}
 }
 
-//select trace_id, span_id, parent_span_id, span_kind, node_uuid, node_type,
-//span_name, DATE_FORMAT(start_time, '%Y-%m-%d %H:%i:%s.%f') AS start_time,
-//DATE_FORMAT(end_time, '%Y-%m-%d %H:%i:%s.%f') AS end_time, duration, resource, extra from
-//system.span_info where span_kind="s3FSOperation"
-//into outfile '/tmp/output_eks.csv' FIELDS TERMINATED BY ',' LINES TERMINATED BY '\n';
-
 func (s *SpanInfoTable) SetVal(name string, val string) {
 	switch name {
 	case "trace_id":
