@@ -12,6 +12,7 @@ import (
 	_type "movis/type"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -66,27 +67,24 @@ func spanVisInit() {
 		spanObjReqStackInfoData = make([]html.SignalLinePageData, 0)
 	}()
 
-	spanVis = new(SpanVis)
+	if spanVis == nil {
+		spanVis = new(SpanVis)
 
-	if _type.SourceFile != "" {
-		return
-	}
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/system?charset=utf8mb4&parseTime=True&loc=Local",
+			_type.SrcUsrName, _type.SrcPassword, _type.SrcHost, _type.SrcPort)
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/system?charset=utf8mb4&parseTime=True&loc=Local",
-		_type.SrcUsrName, _type.SrcPassword, _type.SrcHost, _type.SrcPort)
-
-	var err error
-	spanVis.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Panicf("open %s\n failed", dsn)
+		var err error
+		spanVis.db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		if err != nil {
+			log.Panicf("open %s\n failed", dsn)
+		}
 	}
 
 	spanVis.spanNames = make([]string, 0)
-
 	spanVis.db.Table("span_info").Select("distinct(span_name)").Find(&spanVis.spanNames)
 }
 
-func (s *SpanVis) webReport(w http.ResponseWriter) {
+func (s *SpanVis) webReport(w http.ResponseWriter, tt OpType) {
 	wd, _ := os.Getwd()
 	tmpl, err := template.ParseFiles(wd + "/html/line.html")
 	if err != nil {
@@ -97,6 +95,24 @@ func (s *SpanVis) webReport(w http.ResponseWriter) {
 	if err := tmpl.Execute(w, renderData); err != nil {
 		fmt.Println(err.Error())
 	}
+
+	s.saveWebReport(tmpl, w, tt)
+}
+
+func (s *SpanVis) saveWebReport(tmpl *template.Template, w http.ResponseWriter, tt OpType) {
+	path := fmt.Sprintf("%s%s_%d.html", _type.SpanReportDir, tt.String(), time.Now().UnixMilli())
+	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+		panic(err.Error())
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		log.Panicf(err.Error())
+	}
+
+	if err = tmpl.Execute(file, renderData); err != nil {
+		log.Panicf(err.Error())
+	}
 }
 
 func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
@@ -104,7 +120,7 @@ func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 	paperReportForSpanInfo(tt)
 
 	if _type.DstPort != "" {
-		s.webReport(w)
+		s.webReport(w, tt)
 	}
 }
 
