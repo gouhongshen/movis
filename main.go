@@ -50,6 +50,8 @@ func release() {
 // this format is not allowed:
 //
 //	-xy -rs
+//
+// not support -f for now
 func decodeArgs() {
 	args := os.Args[1:]
 	if len(args) == 0 {

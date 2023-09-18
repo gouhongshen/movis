@@ -24,6 +24,7 @@ const (
 	LocalFSOperation   OpType = 2
 	MemCacheOperation  OpType = 3
 	DiskCacheOperation OpType = 4
+	StatementOperation OpType = 5
 )
 
 var opType2Name = map[OpType]string{
@@ -32,6 +33,7 @@ var opType2Name = map[OpType]string{
 	LocalFSOperation:   "localFSOperation",
 	MemCacheOperation:  "memCacheOperation",
 	DiskCacheOperation: "diskCacheOperation",
+	StatementOperation: "statement",
 }
 
 func (op *OpType) String() string {
@@ -131,8 +133,15 @@ func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 func AnalysisSpanInfoWithoutHttp() {
 	LocalFSOperationHandler(nil, nil)
 	S3FSOperationHandler(nil, nil)
+	StatementOperationHandler(nil, nil)
 	MemCacheOperationHandler(nil, nil)
 	DiskCacheOperationHandler(nil, nil)
+}
+
+func StatementOperationHandler(w http.ResponseWriter, req *http.Request) {
+	spanVisInit()
+	spanVis.visualize(StatementOperation)
+	spanVis.generateReport(w, StatementOperation)
 }
 
 func LocalFSOperationHandler(w http.ResponseWriter, req *http.Request) {
@@ -165,7 +174,7 @@ func (s *SpanVis) visualize(tt OpType) {
 	s.visualize_ObjReqLatency(tt, 10)
 	s.visualize_ObjReqSizeChanges(tt, 10)
 	s.visualize_ObjReqStackInfo(tt)
-	s.visualize_StatementSpent(tt)
+	//s.visualize_StatementSpent(tt)
 }
 
 func (s *SpanVis) visualize_StatementSpent(tt OpType) {
@@ -174,10 +183,13 @@ func (s *SpanVis) visualize_StatementSpent(tt OpType) {
 		duration float64
 	})
 	for _, nt := range NodeType {
+		compileSum := float64(0)
+		compileLen := float64(0)
+
 		var traceIds []string
 		s.db.Table("span_info").Select("distinct(trace_id)").
-			Where(fmt.Sprintf("span_kind='statement' and node_type='%s'", nt)).
-			Limit(1000).Find(&traceIds)
+			Where(fmt.Sprintf("span_kind='statement' and node_type='%s' and extra like '%%execute __mo%%'", nt)).
+			Find(&traceIds)
 
 		for _, id := range traceIds {
 			var data []struct {
@@ -190,11 +202,23 @@ func (s *SpanVis) visualize_StatementSpent(tt OpType) {
 				Where(fmt.Sprintf("span_kind='statement' and trace_id='%s'", id)).
 				Order("span_name").Find(&data)
 
-			tmp := make(map[string]float64)
-			stm := make(map[string]string)
+			tmp := map[string]float64{
+				"Compile.Run": 0, "blockio.BlockRead": 0, "Compile.Compile": 0,
+				"MysqlCmdExecutor.doComQuery": 0, "TxnComputationWrapper.Compile": 0,
+			}
+			stm := map[string]string{}
 			for i := range data {
 				tmp[data[i].SpanName] += data[i].Duration
 				stm[data[i].SpanName] = data[i].Extra
+			}
+
+			if tmp["Compile.Run"] != 0 && tmp["blockio.BlockRead"] != 0 {
+				fmt.Printf("blockRead / Run = %5.2f\n", tmp["blockio.BlockRead"]/tmp["Compile.Run"])
+			}
+
+			if tmp["Compile.Compile"] != 0 {
+				compileSum += tmp["Compile.Compile"]
+				compileLen++
 			}
 
 			for k, _ := range tmp {
@@ -210,6 +234,9 @@ func (s *SpanVis) visualize_StatementSpent(tt OpType) {
 				}{stm[k], tmp[k] / (1000 * 1000)})
 			}
 		}
+
+		fmt.Printf("average compile time = %5.2f\n", compileSum/compileLen/(1000*1000))
+
 	}
 	reportStatement(ret)
 }
