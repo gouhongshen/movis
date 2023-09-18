@@ -61,7 +61,7 @@ select mo_ctl("dn", "TraceSpan", "disable:local,s3");
    1. 在其他负载结束后，跑 TPCC 100 * 100 之前，启用 trace（命令参见上面）
    2. 跑 TPCC 100 * 100 负载
    3. 负载结束后，运行该 visualizer 脚本。运行脚本之前需要先获取到任意一个 CN 的 IP 地址，使用 -h 传递给脚本
-   4. 脚本运行结束后，相关数据会保存在 reports，希望能从 本次 GitHub daily 地址处下载
+   4. 脚本运行结束后，相关数据会保存在 data 目录，希望能从 本次 GitHub daily 地址处下载
    5. 由于 trace 可能会影响性能，所以最后需要向 mo 发送命令关闭 trace（命令见上面）
 
 

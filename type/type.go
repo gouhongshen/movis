@@ -8,8 +8,8 @@ var SrcUsrName string
 var SrcPassword string
 var ReportFile string
 
-const ReportsRootDir string = "./reports"
-const SrcDataDir string = "./src_data"
+const ReportsRootDir string = "./data/reports"
+const SrcDataDir string = "./data/records"
 
 func FillTypeDefault() {
 	//if DstPort == "" {

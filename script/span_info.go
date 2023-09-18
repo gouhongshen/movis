@@ -140,12 +140,11 @@ func DiskCacheOperationHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *SpanVis) visualize(tt OpType) {
-	//s.PrepareData(tt)
-	//s.visualize_ObjReqHeatmap(tt)
-	//s.visualize_ObjReqThroughTime(tt, 30)
-	//s.visualize_ObjReqLatency(tt, 30)
-	//s.visualize_ObjReqSizeChanges(tt, 30)
-	//s.visualize_ObjReqStackInfo(tt)
+	s.visualize_ObjReqHeatmap(tt)
+	s.visualize_ObjReqThroughTime(tt, 30)
+	s.visualize_ObjReqLatency(tt, 30)
+	s.visualize_ObjReqSizeChanges(tt, 30)
+	s.visualize_ObjReqStackInfo(tt)
 	s.visualize_StatementSpent(tt)
 }
 
