@@ -92,36 +92,40 @@ func (s *SpanVis) webReport(w http.ResponseWriter, tt OpType) {
 		return
 	}
 
+	s.saveWebReport(tmpl, w, tt)
+
+	if _type.DstPort == "" {
+		return
+	}
+
 	if err := tmpl.Execute(w, renderData); err != nil {
 		fmt.Println(err.Error())
 	}
 
-	s.saveWebReport(tmpl, w, tt)
 }
 
 func (s *SpanVis) saveWebReport(tmpl *template.Template, w http.ResponseWriter, tt OpType) {
 	path := fmt.Sprintf("%s%s_%d.html", _type.SpanReportDir, tt.String(), time.Now().UnixMilli())
 	if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
-		panic(err.Error())
+		fmt.Println(err.Error())
+		return
 	}
 
 	file, err := os.Create(path)
 	if err != nil {
-		log.Panicf(err.Error())
+		fmt.Println(err.Error())
+		return
 	}
 
 	if err = tmpl.Execute(file, renderData); err != nil {
-		log.Panicf(err.Error())
+		fmt.Println(err.Error())
 	}
 }
 
 func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 	// user hope to generate a paper report
 	paperReportForSpanInfo(tt)
-
-	if _type.DstPort != "" {
-		s.webReport(w, tt)
-	}
+	s.webReport(w, tt)
 }
 
 func AnalysisSpanInfoWithoutHttp() {
@@ -157,9 +161,9 @@ func DiskCacheOperationHandler(w http.ResponseWriter, req *http.Request) {
 
 func (s *SpanVis) visualize(tt OpType) {
 	s.visualize_ObjReqHeatmap(tt)
-	s.visualize_ObjReqThroughTime(tt, 30)
-	s.visualize_ObjReqLatency(tt, 30)
-	s.visualize_ObjReqSizeChanges(tt, 30)
+	s.visualize_ObjReqThroughTime(tt, 10)
+	s.visualize_ObjReqLatency(tt, 10)
+	s.visualize_ObjReqSizeChanges(tt, 10)
 	s.visualize_ObjReqStackInfo(tt)
 	s.visualize_StatementSpent(tt)
 }

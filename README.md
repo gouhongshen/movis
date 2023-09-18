@@ -22,25 +22,18 @@ select mo_ctl("cn", "TraceSpan", "all:enable:local,s3");
 select mo_ctl("dn", "TraceSpan", "enable:local,s3");
 ```
 2. 跑负载，如 TPCC 100 warehouse * 100 terminal
-3. 负载结束后，执行 mo visualizer 脚本。visualizer 有两种使用方式
+3. 负载结束后，执行 mo visualizer 脚本。
    1. 直接读 mo 的表，这种方式，需要指定 mo 的地址、用户名和密码。如果不指定，会使用默认值
       1. -h host: 默认值 127.0.0.1
       2. -P port: 默认值 6001
       3. -p pwd:  默认值 111
       4. -u user:  默认值 dump
 
-[//]: # (暂不支持)
-[//]: # (   2. 提前将 mo 的数据 dump 到 CSV 文件中，visualizer 再分析该 CSV 文件。这种方式不能省略参数)
-
-[//]: # (      1. -f file)
-
-注意，
-
-[//]: # (1. 上述两种方式的参数是互斥的，如果指定了 -f，就不能指定 -h,-P,-p,-u，反之也一样。)
 1. 参数与值之间必须有空格，如 -P 6001, 不能是 -P6001
 2. 参数顺序可以随意
 
-另外，如果需要使用 web 展示功能还可以指定端口号 -http port，如果不指定，那么 visualizer 只会生成文字报告，不会提供 http 服务
+另外，如果需要使用 web 展示功能还可以指定端口号 -http port，如果不指定，那么 visualizer 只会生成文字报告，不会提供 http 服务，
+但会将渲染的 HTML 文件保存下来。
 
 一些运行脚本的例子：
 ```
