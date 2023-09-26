@@ -252,7 +252,8 @@ func (s *SpanVis) visualize_ObjReqStackInfo(tt OpType) {
 			s.db.Table("span_info").
 				Select("json_unquote(json_extract(`extra`, '$.stack')) as stack_name, " +
 					"count(*) as count").
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
+					"end_time < '2023-09-21 10:16:43.116417' ", nt, nn, tt.String())).
 				Group("stack_name").
 				Order("count desc").Find(&data)
 
@@ -282,7 +283,8 @@ func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType, duration int) {
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, "+
 					"avg(cast(json_unquote(json_extract(`extra`, '$.size')) as decimal(10,2))) as avg_size",
 					duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
+					"end_time < '2023-09-21 10:16:43.116417'", nt, nn, tt.String())).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -312,7 +314,8 @@ func (s *SpanVis) visualize_ObjReqLatency(tt OpType, duration int) {
 			s.db.Table("span_info").
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, "+
 					"avg(`duration`) as avg_duration", duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
+					"end_time < '2023-09-21 10:16:43.116417'", nt, nn, tt.String())).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -345,7 +348,8 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration int) {
 			s.db.Table("span_info").
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, count(*) as count",
 					duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s'", nt, tt.String(), nn)).
+				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s' and "+
+					"end_time < '2023-09-21 10:16:43.116417'", nt, tt.String(), nn)).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -382,7 +386,8 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 			}
 
 			s.db.Table("span_info").
-				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s'", nt, tt.String(), nn)).
+				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s' and "+
+					"end_time < '2023-09-21 10:16:43.116417'", nt, tt.String(), nn)).
 				Select("JSON_EXTRACT(extra, '$.name') AS name, COUNT(*) AS count").
 				Group("name").Order("count desc").Find(&data)
 
