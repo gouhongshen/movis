@@ -6,7 +6,7 @@ mo visualizer 提前在代码里埋点，统计相关的 trace 信息到 system.
 目前支持的埋点有：
 
 ```golang
-trace.SpanKindS3FSVis
+trace.SpanKindRemoteFSVis
 trace.SpanKindLocalFSVis
 trace.SpanKindStatement
 ```

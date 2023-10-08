@@ -20,7 +20,7 @@ type OpType int
 
 const (
 	AllFSOperation     OpType = 0
-	S3FSOperation      OpType = 1
+	RemoteFSOperation  OpType = 1
 	LocalFSOperation   OpType = 2
 	MemCacheOperation  OpType = 3
 	DiskCacheOperation OpType = 4
@@ -29,7 +29,7 @@ const (
 
 var opType2Name = map[OpType]string{
 	AllFSOperation:     "allFSOperation",
-	S3FSOperation:      "s3FSOperation",
+	RemoteFSOperation:  "RemoteFSOperation",
 	LocalFSOperation:   "localFSOperation",
 	MemCacheOperation:  "memCacheOperation",
 	DiskCacheOperation: "diskCacheOperation",
@@ -132,7 +132,7 @@ func (s *SpanVis) generateReport(w http.ResponseWriter, tt OpType) {
 
 func AnalysisSpanInfoWithoutHttp() {
 	LocalFSOperationHandler(nil, nil)
-	S3FSOperationHandler(nil, nil)
+	RemoteFSOperationHandler(nil, nil)
 	StatementOperationHandler(nil, nil)
 	MemCacheOperationHandler(nil, nil)
 	DiskCacheOperationHandler(nil, nil)
@@ -150,10 +150,10 @@ func LocalFSOperationHandler(w http.ResponseWriter, req *http.Request) {
 	spanVis.generateReport(w, LocalFSOperation)
 }
 
-func S3FSOperationHandler(w http.ResponseWriter, req *http.Request) {
+func RemoteFSOperationHandler(w http.ResponseWriter, req *http.Request) {
 	spanVisInit()
-	spanVis.visualize(S3FSOperation)
-	spanVis.generateReport(w, S3FSOperation)
+	spanVis.visualize(RemoteFSOperation)
+	spanVis.generateReport(w, RemoteFSOperation)
 }
 
 func MemCacheOperationHandler(w http.ResponseWriter, req *http.Request) {
@@ -252,8 +252,7 @@ func (s *SpanVis) visualize_ObjReqStackInfo(tt OpType) {
 			s.db.Table("span_info").
 				Select("json_unquote(json_extract(`extra`, '$.stack')) as stack_name, " +
 					"count(*) as count").
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
-					"end_time < '2023-09-21 10:16:43.116417' ", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
 				Group("stack_name").
 				Order("count desc").Find(&data)
 
@@ -283,8 +282,7 @@ func (s *SpanVis) visualize_ObjReqSizeChanges(tt OpType, duration int) {
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, "+
 					"avg(cast(json_unquote(json_extract(`extra`, '$.size')) as decimal(10,2))) as avg_size",
 					duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
-					"end_time < '2023-09-21 10:16:43.116417'", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -314,8 +312,7 @@ func (s *SpanVis) visualize_ObjReqLatency(tt OpType, duration int) {
 			s.db.Table("span_info").
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, "+
 					"avg(`duration`) as avg_duration", duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s' and "+
-					"end_time < '2023-09-21 10:16:43.116417'", nt, nn, tt.String())).
+				Where(fmt.Sprintf("node_type='%s' and span_name='%s' and span_kind='%s'", nt, nn, tt.String())).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -348,8 +345,7 @@ func (s *SpanVis) visualize_ObjReqThroughTime(tt OpType, duration int) {
 			s.db.Table("span_info").
 				Select(fmt.Sprintf("floor(unix_timestamp(`start_time`)/%d)*%d as timestamp, count(*) as count",
 					duration, duration)).
-				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s' and "+
-					"end_time < '2023-09-21 10:16:43.116417'", nt, tt.String(), nn)).
+				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s'", nt, tt.String(), nn)).
 				Group("timestamp").
 				Order("timestamp").Find(&data)
 
@@ -386,8 +382,7 @@ func (s *SpanVis) visualize_ObjReqHeatmap(tt OpType) {
 			}
 
 			s.db.Table("span_info").
-				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s' and "+
-					"end_time < '2023-09-21 10:16:43.116417'", nt, tt.String(), nn)).
+				Where(fmt.Sprintf("node_type='%s' and span_kind='%s' and span_name='%s'", nt, tt.String(), nn)).
 				Select("JSON_EXTRACT(extra, '$.name') AS name, COUNT(*) AS count").
 				Group("name").Order("count desc").Find(&data)
 
