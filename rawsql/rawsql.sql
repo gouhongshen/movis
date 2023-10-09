@@ -9,11 +9,13 @@ FROM statement_info
 WHERE transaction_id IN (
     SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(extra, '$.txn_id'))
     FROM span_info
-    WHERE span_name = "MysqlCmdExecutor.executeStmt"
+    WHERE span_name = "Compile.Run"
 )
-  AND statement LIKE "%__mo_stmt_id%"
+
 GROUP BY min_timestamp
 Order By min_timestamp asc;
+
+
 
 
 
@@ -27,14 +29,14 @@ WHERE trace_id IN (
     FROM span_info
     WHERE span_name = "MysqlCmdExecutor.executeStmt"
 )
-  AND span_name = "LocalFS.Read"
+  AND span_name = "S3FS.Read"
 GROUP BY min_timestamp
 Order By min_timestamp asc;
 
 
 
 -- 每分钟 S3FS.read 流量 （MB 每秒）
-# 流量 = 字节数 / 时间
+--  流量 = 字节数 / 时间
 SELECT
     DATE_FORMAT(end_time, '%Y-%m-%d %H:%i') AS min_timestamp,
     SUM(CAST(json_unquote(json_extract(extra, "$.size")) as UNSIGNED)) / CAST(1024*1024*60 as UNSIGNED) AS kb_by_sec
@@ -60,8 +62,32 @@ Order By min_timestamp asc;
 
 
 
-# 每分钟 rollback 次数
+-- 每分钟 Commit 平均耗时
+SELECT
+    DATE_FORMAT(end_time, '%Y-%m-%d %H:%i') AS min_timestamp,
+    AVG(duration) / CAST(1000000000 AS UNSIGNED) AS avg_duration
+FROM span_info
+Where span_name = "Session.CommitTxn" AND json_unquote(json_extract(extra, "$.txn_id")) in (
+    SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(extra, '$.txn_id'))
+    FROM span_info
+    WHERE span_name = "MysqlCmdExecutor.executeStmt"
+    )
+GROUP BY min_timestamp
+Order By min_timestamp asc;
 
+
+-- 每分钟 Rollback 平均耗时
+SELECT
+    DATE_FORMAT(end_time, '%Y-%m-%d %H:%i') AS min_timestamp,
+    AVG(duration) / CAST(1000000000 AS UNSIGNED) AS avg_duration
+FROM span_info
+Where span_name = "Session.Rollback"
+GROUP BY min_timestamp
+Order By min_timestamp asc;
+
+
+
+--  每分钟 rollback 次数
 SELECT
     DATE_FORMAT(end_time, '%Y-%m-%d %H:%i') AS min_timestamp,
     count(*) as rollback_cnt
@@ -70,6 +96,16 @@ WHERE span_name = "Session.RollbackTxn" AND node_uuid="37386263-6331-6466-6661-6
 GROUP BY min_timestamp
 Order By min_timestamp asc;
 
+
+
+-- 每分钟 Commit 次数
+SELECT
+    DATE_FORMAT(end_time, '%Y-%m-%d %H:%i') AS min_timestamp,
+    count(*) as rollback_cnt
+FROM span_info
+WHERE span_name = "Session.CommitTxn"
+GROUP BY min_timestamp
+Order By min_timestamp asc;
 
 
 -- 事务的总耗时
@@ -98,13 +134,12 @@ ORDER BY min_timestamp ASC;
 
 
 -- 每分钟内存平均缓存命中率
--- SELECT
---     DATE_FORMAT(`timestamp`, '%Y-%m-%d %H:%i') AS min_timestamp,
---     AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(extra, '$."FileService Cache Memory Hit Rate"')) AS DOUBLE)) AS avg_cache_hit_rate
--- FROM log_info
--- WHERE `timestamp` < "2023-09-25 07:16:00" and `timestamp` >  "2023-09-25 06:45:56"
--- GROUP BY min_timestamp
--- ORDER BY min_timestamp ASC;
+SELECT
+    DATE_FORMAT(`timestamp`, '%Y-%m-%d %H:%i') AS min_timestamp,
+    AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(extra, '$."FileService Cache Memory Hit Rate"')) AS DOUBLE)) AS avg_cache_hit_rate
+FROM log_info
+GROUP BY min_timestamp
+ORDER BY min_timestamp ASC;
 
 
 
@@ -138,10 +173,10 @@ ORDER BY min_timestamp ASC;
 
 
 -- executeStmt 的总用时
--- select SUM(duration) / CAST(1000000000 AS UNSIGNED) as total_dur
--- from span_info where span_name = "MysqlCmdExecutor.executeStmt" and trace_id in (
--- 	select trace_id from span_info where span_name = "Compile.Run" and JSON_UNQUOTE(JSON_EXTRACT(extra, '$.statement')) LIKE "%__mo_stmt_id%"
--- )
+select SUM(duration) / CAST(1000000000 AS UNSIGNED) as total_dur
+from span_info
+where span_name = "MysqlCmdExecutor.executeStmt"
+and start_time >= "2023-10-09 06:38:35" and end_time <= "2023-10-09 07:08:49";
 
 -- 54299.824955776
 
@@ -250,8 +285,8 @@ Order By min_timestamp asc;
 
 
 
-# 每个 TPCC session 中各部分时间占比
-# 各个 Session 总时间
+--  每个 TPCC session 中各部分时间占比
+--  各个 Session 总时间
 select SUM(duration)/CAST(1000*1000*1000 AS UNSIGNED) as total_sec, count(*) as cnt
 from system.span_info
 where span_name = "Routine.handleRequest" and trace_id in (
@@ -264,10 +299,10 @@ group by trace_id
 order by trace_id desc;
 
 
-# 各个 阶段 总时间
+--  各个 阶段 总时间
 select SUM(duration)/CAST(1000*1000*1000 AS UNSIGNED) as total_sec, count(*) as cnt
 from system.span_info
-where span_name = "TxnHandler.CommitTxn" and trace_id in (
+where span_name = "MysqlCmdExecutor.executeStmt" and trace_id in (
     select trace_id from system.span_info
     where span_name = "Routine.handleRequest"
     group by trace_id
@@ -296,9 +331,9 @@ RoutineManager.Handler --> Routine.handleRequest
 
 
 
-# metadata scan, 一张表有多少个 object，多少个 blk，大小分别是多少
+-- metadata scan, 一张表有多少个 object，多少个 blk，大小分别是多少
 
-# 以object分组
+--  以object分组
 select
     count(*) as cnt,
     sum(origin_size) / cast(1024 * 1024 as BIGINT) as sum_origin_size,
@@ -324,7 +359,7 @@ group by block_id;
 
 
 
-# 一个 object 有多少行
+-- 一个 object 有多少行
 select avg(cnt), count(*)
 from (select sum(rows_cnt) as cnt
       from metadata_scan('system.statement_info', '*') t

@@ -29,7 +29,7 @@ const (
 
 var opType2Name = map[OpType]string{
 	AllFSOperation:     "allFSOperation",
-	RemoteFSOperation:  "RemoteFSOperation",
+	RemoteFSOperation:  "s3FSOperation",
 	LocalFSOperation:   "localFSOperation",
 	MemCacheOperation:  "memCacheOperation",
 	DiskCacheOperation: "diskCacheOperation",
